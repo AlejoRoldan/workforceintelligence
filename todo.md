@@ -56,7 +56,7 @@
 ## Mejoras Post-Entrega
 - [x] Eliminar o implementar ruta /dashboard/admin/collaborators
 - [x] Redirección post-login basada en rol (admin -> /dashboard/admin, user -> /dashboard)
-- [ ] Evaluación AI incremental por respuesta durante la prueba
+- [x] Evaluación AI incremental por respuesta durante la prueba (Sprint 3 — streaming)
 
 ## GitHub
 - [x] Subir código al repositorio AlejoRoldan/workforceintelligence
@@ -87,3 +87,14 @@
 - [x] Guardar competency_evidence por cada respuesta evaluada
 - [x] Actualizar Dashboard Colaborador para mostrar expectativas por rol
 - [x] Tests del Competency Engine (extracción, scoring con expectativas, evidence)
+
+## Sprint 3 — Streaming SSE (Evaluación Incremental)
+- [x] Crear server/services/streaming.service.ts con helper invokeLLMStream
+- [x] Crear endpoint Express POST /api/assess/stream con autenticación JWT
+- [x] Protocolo de eventos SSE: token, eval_complete, error, done
+- [x] Crear client/src/hooks/useAssessmentStream.ts para consumir el SSE
+- [x] Actualizar ProofOfSkills.tsx: feedback incremental por pregunta en tiempo real
+- [x] Indicador visual de "AI evaluando..." con animación mientras llega el stream
+- [x] Guardar resultado final en DB al completar el stream de cada respuesta
+- [x] Tests del endpoint SSE y del hook de streaming (20 tests)
+- [x] 0 errores TypeScript
