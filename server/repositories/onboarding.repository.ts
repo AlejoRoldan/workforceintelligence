@@ -87,6 +87,19 @@ export async function resetOnboarding(sessionId: number): Promise<void> {
     .where(eq(onboardingSessions.id, sessionId));
 }
 
+export async function getOnboardingByUserId(userId: number): Promise<OnboardingSessionRow | null> {
+  const db = await getDb();
+  if (!db) return null;
+
+  const rows = await db
+    .select()
+    .from(onboardingSessions)
+    .where(eq(onboardingSessions.userId, userId))
+    .limit(1);
+
+  return rows.length > 0 ? mapRow(rows[0]!) : null;
+}
+
 export async function getAllOnboardingSessions(): Promise<OnboardingSessionRow[]> {
   const db = await getDb();
   if (!db) return [];

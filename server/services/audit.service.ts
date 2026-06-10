@@ -13,6 +13,8 @@ export type AuditAction =
   | "user.profile_updated"
   | "admin.stats_viewed"
   | "admin.collaborators_viewed"
+  | "admin.collaborator_detail_viewed"
+  | "admin.csv_exported"
   | "auth.login"
   | "auth.logout";
 

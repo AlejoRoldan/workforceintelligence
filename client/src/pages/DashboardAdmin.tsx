@@ -1,17 +1,30 @@
+/**
+ * DashboardAdmin — Panel P&C para Administradores.
+ * Sprint 4: filtros por área/estado, búsqueda, exportación CSV, enlace a detalle.
+ */
+import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { HexRadarChart, RadarLegend, type RadarScore } from "@/components/HexRadarChart";
+import { useLocation } from "wouter";
 import {
   Users,
   CheckCircle2,
   Target,
+  BarChart3,
   TrendingUp,
   TrendingDown,
-  BarChart3,
-  Clock,
   Minus,
+  Search,
+  Download,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
+import { toast } from "sonner";
 
 type Collaborator = {
   id: number;
@@ -23,7 +36,7 @@ type Collaborator = {
   assessmentStatus: string;
   overallScore: number | null;
   radarScores: RadarScore[];
-  createdAt: Date;
+  completedAt: Date | null;
 };
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
@@ -33,10 +46,39 @@ const STATUS_BADGE: Record<string, { label: string; color: string }> = {
 };
 
 export default function DashboardAdmin() {
+  const [, navigate] = useLocation();
+
+  // Filter state
+  const [search, setSearch] = useState("");
+  const [deptFilter, setDeptFilter] = useState("all");
+  const [assessFilter, setAssessFilter] = useState("all");
+  const [onbFilter, setOnbFilter] = useState("all");
+  const [csvLoading, setCsvLoading] = useState(false);
+
   const { data: stats, isLoading: statsLoading } = trpc.admin.getStats.useQuery();
-  const { data: collaborators = [], isLoading: collabLoading } = trpc.admin.getCollaborators.useQuery();
+  const { data: allCollaborators = [], isLoading: collabLoading } = trpc.admin.getCollaborators.useQuery();
+  const { data: departments = [] } = trpc.admin.getDepartments.useQuery();
 
   const isLoading = statsLoading || collabLoading;
+
+  // Client-side filtering (fast, no extra network round-trips)
+  const collaborators = useMemo(() => {
+    let list = allCollaborators as Collaborator[];
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter(
+        (c) =>
+          c.name?.toLowerCase().includes(q) ||
+          c.email?.toLowerCase().includes(q) ||
+          c.jobTitle?.toLowerCase().includes(q) ||
+          c.department?.toLowerCase().includes(q)
+      );
+    }
+    if (deptFilter !== "all") list = list.filter((c) => c.department === deptFilter);
+    if (assessFilter !== "all") list = list.filter((c) => c.assessmentStatus === assessFilter);
+    if (onbFilter !== "all") list = list.filter((c) => c.onboardingStatus === onbFilter);
+    return list;
+  }, [allCollaborators, search, deptFilter, assessFilter, onbFilter]);
 
   const domainAverages = stats?.domainAverages ?? [];
   const radarData: RadarScore[] = domainAverages.map((d) => ({
@@ -45,20 +87,53 @@ export default function DashboardAdmin() {
     expected: d.expected,
   }));
 
+  // CSV export
+  const handleExportCSV = async () => {
+    setCsvLoading(true);
+    try {
+      const response = await fetch("/api/admin/export.csv", { credentials: "include" });
+      if (!response.ok) throw new Error("Error al exportar");
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `itti-talent-export-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("CSV exportado correctamente");
+    } catch {
+      toast.error("No se pudo exportar el CSV");
+    } finally {
+      setCsvLoading(false);
+    }
+  };
+
   return (
     <div className="h-full overflow-y-auto">
       <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {/* Header */}
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 text-xs">
-              People & Culture
-            </Badge>
+        <div className="flex items-start justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5 text-xs">
+                People & Culture
+              </Badge>
+            </div>
+            <h1 className="text-2xl font-bold text-foreground">Dashboard P&C</h1>
+            <p className="text-muted-foreground mt-1 text-sm">
+              Vista organizacional del talento · Administrador P&C
+            </p>
           </div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard P&C</h1>
-          <p className="text-muted-foreground mt-1 text-sm">
-            Vista organizacional del talento · Administrador P&C
-          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            className="btn-press flex items-center gap-1.5"
+            onClick={handleExportCSV}
+            disabled={csvLoading}
+          >
+            {csvLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+            Exportar CSV
+          </Button>
         </div>
 
         {/* Metric cards */}
@@ -95,7 +170,6 @@ export default function DashboardAdmin() {
 
         {/* Organizational radar + domain breakdown */}
         <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-          {/* Radar organizacional */}
           <div className="lg:col-span-2">
             <Card className="card-soft border-border h-full">
               <CardHeader className="pb-2">
@@ -120,7 +194,6 @@ export default function DashboardAdmin() {
             </Card>
           </div>
 
-          {/* Domain breakdown */}
           <div className="lg:col-span-3">
             <Card className="card-soft border-border h-full">
               <CardHeader className="pb-3">
@@ -146,14 +219,8 @@ export default function DashboardAdmin() {
                         </div>
                       </div>
                       <div className="relative h-2 rounded-full bg-muted overflow-hidden">
-                        <div
-                          className="absolute top-0 left-0 h-full rounded-full bg-primary/25"
-                          style={{ width: `${d.expected}%` }}
-                        />
-                        <div
-                          className={`absolute top-0 left-0 h-full rounded-full transition-all ${d.average >= d.expected ? "bg-primary" : "bg-rose-400"}`}
-                          style={{ width: `${Math.round(d.average)}%` }}
-                        />
+                        <div className="absolute top-0 left-0 h-full rounded-full bg-primary/25" style={{ width: `${d.expected}%` }} />
+                        <div className={`absolute top-0 left-0 h-full rounded-full transition-all ${d.average >= d.expected ? "bg-primary" : "bg-rose-400"}`} style={{ width: `${Math.round(d.average)}%` }} />
                       </div>
                     </div>
                   );
@@ -167,27 +234,92 @@ export default function DashboardAdmin() {
           </div>
         </div>
 
-        {/* Collaborators table */}
+        {/* Collaborators table with filters */}
         <Card className="card-soft border-border">
           <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <CardTitle className="text-sm flex items-center gap-2">
                 <Users size={15} className="text-primary" />
                 Colaboradores
+                <Badge variant="outline" className="text-xs ml-1">
+                  {collaborators.length} / {(allCollaborators as Collaborator[]).length}
+                </Badge>
               </CardTitle>
-              <Badge variant="outline" className="text-xs">
-                {collaborators.length} total
-              </Badge>
+            </div>
+
+            {/* Filters row */}
+            <div className="flex flex-wrap gap-2 mt-3">
+              <div className="relative flex-1 min-w-[180px]">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por nombre, cargo, área..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8 h-8 text-xs"
+                />
+              </div>
+
+              {departments.length > 0 && (
+                <Select value={deptFilter} onValueChange={setDeptFilter}>
+                  <SelectTrigger className="h-8 text-xs w-[140px]">
+                    <SelectValue placeholder="Área" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Todas las áreas</SelectItem>
+                    {(departments as string[]).map((d) => (
+                      <SelectItem key={d} value={d}>{d}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+
+              <Select value={assessFilter} onValueChange={setAssessFilter}>
+                <SelectTrigger className="h-8 text-xs w-[140px]">
+                  <SelectValue placeholder="Evaluación" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas</SelectItem>
+                  <SelectItem value="completed">Completada</SelectItem>
+                  <SelectItem value="in_progress">En progreso</SelectItem>
+                  <SelectItem value="pending">Pendiente</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Select value={onbFilter} onValueChange={setOnbFilter}>
+                <SelectTrigger className="h-8 text-xs w-[140px]">
+                  <SelectValue placeholder="Onboarding" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="completed">Completado</SelectItem>
+                  <SelectItem value="in_progress">En progreso</SelectItem>
+                  <SelectItem value="pending">Pendiente</SelectItem>
+                </SelectContent>
+              </Select>
+
+              {(search || deptFilter !== "all" || assessFilter !== "all" || onbFilter !== "all") && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 text-xs text-muted-foreground"
+                  onClick={() => { setSearch(""); setDeptFilter("all"); setAssessFilter("all"); setOnbFilter("all"); }}
+                >
+                  Limpiar filtros
+                </Button>
+              )}
             </div>
           </CardHeader>
+
           <CardContent>
             {collabLoading ? (
               <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
-                Cargando...
+                <Loader2 size={16} className="animate-spin mr-2" /> Cargando...
               </div>
             ) : collaborators.length === 0 ? (
               <div className="flex items-center justify-center h-24 text-muted-foreground text-sm">
-                Aún no hay colaboradores registrados
+                {(allCollaborators as Collaborator[]).length === 0
+                  ? "Aún no hay colaboradores registrados"
+                  : "No hay resultados para los filtros aplicados"}
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -195,10 +327,11 @@ export default function DashboardAdmin() {
                   <thead>
                     <tr className="border-b border-border">
                       <th className="text-left py-2.5 pr-4 text-xs font-medium text-muted-foreground">Colaborador</th>
-                      <th className="text-left py-2.5 pr-4 text-xs font-medium text-muted-foreground">Cargo</th>
+                      <th className="text-left py-2.5 pr-4 text-xs font-medium text-muted-foreground">Cargo / Área</th>
                       <th className="text-center py-2.5 pr-4 text-xs font-medium text-muted-foreground">Onboarding</th>
                       <th className="text-center py-2.5 pr-4 text-xs font-medium text-muted-foreground">Evaluación</th>
-                      <th className="text-center py-2.5 text-xs font-medium text-muted-foreground">Puntaje</th>
+                      <th className="text-center py-2.5 pr-4 text-xs font-medium text-muted-foreground">Puntaje</th>
+                      <th className="text-center py-2.5 text-xs font-medium text-muted-foreground">Detalle</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
@@ -227,16 +360,12 @@ export default function DashboardAdmin() {
                             )}
                           </td>
                           <td className="py-3 pr-4 text-center">
-                            <Badge className={`text-xs ${onbCfg.color}`}>
-                              {onbCfg.label}
-                            </Badge>
+                            <Badge className={`text-xs ${onbCfg.color}`}>{onbCfg.label}</Badge>
                           </td>
                           <td className="py-3 pr-4 text-center">
-                            <Badge className={`text-xs ${asmCfg.color}`}>
-                              {asmCfg.label}
-                            </Badge>
+                            <Badge className={`text-xs ${asmCfg.color}`}>{asmCfg.label}</Badge>
                           </td>
-                          <td className="py-3 text-center">
+                          <td className="py-3 pr-4 text-center">
                             {c.overallScore != null ? (
                               <span className={`text-sm font-bold ${c.overallScore >= 70 ? "text-emerald-600" : c.overallScore >= 50 ? "text-amber-600" : "text-rose-500"}`}>
                                 {Math.round(c.overallScore)}
@@ -244,6 +373,16 @@ export default function DashboardAdmin() {
                             ) : (
                               <span className="text-muted-foreground text-xs">—</span>
                             )}
+                          </td>
+                          <td className="py-3 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 btn-press"
+                              onClick={() => navigate(`/dashboard/admin/collaborator/${c.id}`)}
+                            >
+                              <ExternalLink size={13} className="text-primary" />
+                            </Button>
                           </td>
                         </tr>
                       );
@@ -259,7 +398,6 @@ export default function DashboardAdmin() {
   );
 }
 
-// ── Metric card component ─────────────────────────────────────────────────────
 function MetricCard({
   icon: Icon,
   label,

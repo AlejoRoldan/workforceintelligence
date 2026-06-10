@@ -98,3 +98,21 @@
 - [x] Guardar resultado final en DB al completar el stream de cada respuesta
 - [x] Tests del endpoint SSE y del hook de streaming (20 tests)
 - [x] 0 errores TypeScript
+
+## Sprint 4 — Dashboard P&C Enriquecido
+- [x] Endpoint tRPC admin.getCollaborators con filtros por área/departamento/estado
+- [x] Endpoint tRPC admin.getCollaboratorDetail con historial completo de evaluaciones
+- [x] Endpoint tRPC admin.getDepartments para filtro dinámico de áreas
+- [x] Endpoint Express GET /api/admin/export.csv para descarga directa del archivo
+- [x] Filtros en UI: búsqueda por nombre, filtro por departamento, filtro por estado
+- [x] Vista de detalle por colaborador: radar personal, brechas, perfil de onboarding, resumen AI
+- [x] Botón "Exportar CSV" en Dashboard Admin con descarga inmediata (BOM para Excel)
+- [x] Tabla de colaboradores con columnas: nombre, cargo/área, estados, puntaje, botón detalle
+- [x] Tests del Sprint 4 (23 tests: CSV escaping, headers, filtros, scoring, audit)
+- [x] 0 errores TypeScript — 71 tests pasando en 5 archivos
+
+## Deuda Técnica Sprint 4 (Sprints futuros)
+- [ ] Paginación real en tabla de colaboradores del Dashboard Admin
+- [ ] Columna "Fecha evaluación" en tabla de colaboradores
+- [ ] Historial completo de sesiones/evaluaciones por colaborador en vista detalle
+- [ ] Tests de integración para GET /api/admin/export.csv

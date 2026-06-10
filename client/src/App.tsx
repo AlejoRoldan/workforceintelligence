@@ -9,6 +9,7 @@ import Onboarding from "./pages/Onboarding";
 import ProofOfSkills from "./pages/ProofOfSkills";
 import DashboardCollaborator from "./pages/DashboardCollaborator";
 import DashboardAdmin from "./pages/DashboardAdmin";
+import CollaboratorDetail from "./pages/CollaboratorDetail";
 import IttiLayout from "./components/IttiLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 import { getLoginUrl } from "./const";
@@ -70,6 +71,16 @@ function AppRouter() {
           <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} />} />
           <Route path="/proof-of-skills" component={() => <ProtectedRoute component={ProofOfSkills} />} />
           <Route path="/dashboard/admin" component={() => <ProtectedRoute component={DashboardAdmin} adminOnly />} />
+          <Route path="/dashboard/admin/collaborator/:id" component={({ params }) => {
+            const userId = parseInt(params?.id ?? "0");
+            if (!userId) return <NotFound />;
+            return (
+              <ProtectedRoute
+                component={() => <CollaboratorDetail userId={userId} />}
+                adminOnly
+              />
+            );
+          }} />
           <Route component={NotFound} />
         </Switch>
       </IttiLayout>

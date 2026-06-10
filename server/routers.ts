@@ -289,28 +289,114 @@ export const appRouter = router({
       };
     }),
 
-    getCollaborators: adminProcedure.query(async ({ ctx }) => {
-      const [allUsers, allOnboardings, allAssessments] = await Promise.all([
-        getAllUsers(),
-        getAllOnboardingSessions(),
-        getAllAssessments(),
-      ]);
+    getCollaborators: adminProcedure
+      .input(
+        z.object({
+          search: z.string().optional(),
+          department: z.string().optional(),
+          assessmentStatus: z.enum(["all", "pending", "in_progress", "completed"]).optional(),
+          onboardingStatus: z.enum(["all", "pending", "in_progress", "completed"]).optional(),
+        }).optional()
+      )
+      .query(async ({ ctx, input }) => {
+        const [allUsers, allOnboardings, allAssessments] = await Promise.all([
+          getAllUsers(),
+          getAllOnboardingSessions(),
+          getAllAssessments(),
+        ]);
 
-      auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.collaborators_viewed", "users"));
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.collaborators_viewed", "users"));
 
-      return allUsers
-        .filter((u) => u.role === "user")
-        .map((user) => {
-          const onboarding = allOnboardings.find((o) => o.userId === user.id);
-          const assessment = allAssessments.find((a) => a.userId === user.id);
-          return {
-            ...user,
-            onboardingStatus: onboarding?.status ?? "pending",
-            assessmentStatus: assessment?.status ?? "pending",
-            overallScore: assessment?.overallScore ?? null,
-            radarScores: (assessment?.radarScores ?? []) as RadarScore[],
-          };
-        });
+        let collaborators = allUsers
+          .filter((u) => u.role === "user")
+          .map((user) => {
+            const onboarding = allOnboardings.find((o) => o.userId === user.id);
+            const assessment = allAssessments.find((a) => a.userId === user.id);
+            return {
+              ...user,
+              onboardingStatus: onboarding?.status ?? "pending",
+              assessmentStatus: assessment?.status ?? "pending",
+              overallScore: assessment?.overallScore ?? null,
+              radarScores: (assessment?.radarScores ?? []) as RadarScore[],
+              completedAt: assessment?.completedAt ?? null,
+            };
+          });
+
+        // Apply filters
+        if (input?.search) {
+          const q = input.search.toLowerCase();
+          collaborators = collaborators.filter(
+            (c) =>
+              c.name?.toLowerCase().includes(q) ||
+              c.email?.toLowerCase().includes(q) ||
+              c.jobTitle?.toLowerCase().includes(q) ||
+              c.department?.toLowerCase().includes(q)
+          );
+        }
+        if (input?.department && input.department !== "all") {
+          collaborators = collaborators.filter((c) => c.department === input.department);
+        }
+        if (input?.assessmentStatus && input.assessmentStatus !== "all") {
+          collaborators = collaborators.filter((c) => c.assessmentStatus === input.assessmentStatus);
+        }
+        if (input?.onboardingStatus && input.onboardingStatus !== "all") {
+          collaborators = collaborators.filter((c) => c.onboardingStatus === input.onboardingStatus);
+        }
+
+        return collaborators;
+      }),
+
+    getCollaboratorDetail: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { findUserById } = await import("./repositories/user.repository");
+        const { getOnboardingByUserId } = await import("./repositories/onboarding.repository");
+        const { getEvidenceByAssessment } = await import("./repositories/competency.repository");
+
+        const [user, onboarding, assessment] = await Promise.all([
+          findUserById(input.userId),
+          getOnboardingByUserId(input.userId),
+          getAssessmentByUserId(input.userId),
+        ]);
+
+        if (!user) throw new TRPCError({ code: "NOT_FOUND", message: "Colaborador no encontrado" });
+
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.collaborator_detail_viewed", String(input.userId)));
+
+        // Get evidence for this assessment
+        let evidence: Awaited<ReturnType<typeof getEvidenceByAssessment>> = [];
+        if (assessment) {
+          evidence = await getEvidenceByAssessment(assessment.id);
+        }
+
+        return {
+          user,
+          onboarding: onboarding ? {
+            status: onboarding.status,
+            profile: onboarding.competencyProfile,
+            messageCount: (onboarding.messages as unknown[])?.length ?? 0,
+            completedAt: onboarding.completedAt,
+          } : null,
+          assessment: assessment ? {
+            status: assessment.status,
+            overallScore: assessment.overallScore,
+            radarScores: assessment.radarScores as RadarScore[],
+            summary: assessment.summary,
+            completedAt: assessment.completedAt,
+            questionCount: assessment.questions.length,
+          } : null,
+          evidence,
+        };
+      }),
+
+    getDepartments: adminProcedure.query(async () => {
+      const allUsers = await getAllUsers();
+      const departments = Array.from(new Set(
+        allUsers
+          .filter((u) => u.role === "user" && u.department)
+          .map((u) => u.department!)
+      )).sort();
+      return departments;
     }),
   }),
 });
