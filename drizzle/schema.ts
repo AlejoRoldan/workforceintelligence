@@ -112,6 +112,22 @@ export const competencyEvidence = mysqlTable("competency_evidence", {
 export type CompetencyEvidence = typeof competencyEvidence.$inferSelect;
 export type InsertCompetencyEvidence = typeof competencyEvidence.$inferInsert;
 
+// ─── Learning Plans ─────────────────────────────────────────────────────────
+// AI-generated personalized development plan per collaborator post-assessment.
+export const learningPlans = mysqlTable("learning_plans", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  assessmentId: int("assessmentId").notNull(),
+  status: mysqlEnum("status", ["generating", "ready", "in_progress", "completed"]).default("generating").notNull(),
+  planJson: json("planJson").$type<LearningPlan>(),
+  generatedAt: timestamp("generatedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type LearningPlanRow = typeof learningPlans.$inferSelect;
+export type InsertLearningPlan = typeof learningPlans.$inferInsert;
+
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 export type MacroDomain =
   | "Digital & GenAI"
@@ -150,4 +166,40 @@ export interface RadarScore {
   domain: MacroDomain;
   score: number;
   expected: number;
+}
+
+// ─── Learning Plan Types ──────────────────────────────────────────────────────
+export interface LearningAction {
+  id: string;                    // nanoid
+  title: string;                 // e.g. "Completar curso de Prompt Engineering"
+  description: string;           // 1-2 sentences
+  resourceType: "course" | "book" | "practice" | "mentoring" | "project";
+  resourceUrl?: string;          // optional link
+  estimatedHours: number;        // effort estimate
+  priority: "high" | "medium" | "low";
+  completed: boolean;
+  completedAt?: string;          // ISO date string
+}
+
+export interface LearningDomainPlan {
+  domain: MacroDomain;
+  currentScore: number;          // from assessment
+  expectedScore: number;         // from role expectations
+  gap: number;                   // expected - current
+  priority: "critical" | "moderate" | "on-track";
+  rationale: string;             // AI explanation of why this domain matters
+  actions: LearningAction[];     // 2-4 concrete actions
+}
+
+export interface LearningPlan {
+  version: 1;
+  collaboratorName: string;
+  jobTitle: string;
+  generatedAt: string;           // ISO date string
+  overallGapScore: number;       // weighted average gap
+  topPriorityDomain: MacroDomain;
+  executiveSummary: string;      // AI narrative (2-3 sentences)
+  domains: LearningDomainPlan[]; // one entry per domain with gap > 0
+  totalActions: number;
+  estimatedTotalHours: number;
 }

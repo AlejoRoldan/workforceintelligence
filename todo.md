@@ -116,3 +116,23 @@
 - [ ] Columna "Fecha evaluación" en tabla de colaboradores
 - [ ] Historial completo de sesiones/evaluaciones por colaborador en vista detalle
 - [ ] Tests de integración para GET /api/admin/export.csv
+
+## Sprint 5 — Rutas de Aprendizaje (Learning Paths)
+- [x] Tabla learning_plans en schema Drizzle con campos: userId, assessmentId, planJson, status, generatedAt
+- [x] Migración SQL aplicada para learning_plans
+- [x] Repositorio learning.repository.ts con operaciones CRUD
+- [x] Servicio learning.service.ts con generación AI de plan personalizado por brechas
+- [x] Procedimiento tRPC learning.generate (idempotente, con enriquecimiento de expectativas por rol)
+- [x] Procedimiento tRPC learning.getMyPlan para consultar plan del colaborador
+- [x] Procedimiento tRPC learning.updateActionStatus con verificación de ownership
+- [x] Página LearningPath.tsx con plan por dominio, recursos, acciones, progreso y stats
+- [x] Integración en ProofOfSkills: botón "Mi Ruta de Aprendizaje" al finalizar
+- [x] Card de progreso de ruta en Dashboard Colaborador (grid 3 columnas)
+- [x] Nav item "Ruta de Aprendizaje" en sidebar + ruta /learning-path registrada
+- [x] Tests del Sprint 5 — 21 tests: classifyGapPriority, hasSignificantGaps, structure, sorting, progress, preconditions, hours
+- [x] 0 errores TypeScript — 92 tests pasando en 6 archivos
+
+## Deuda Técnica Sprint 5 (Sprints futuros)
+- [x] Corregir getLearningPlanByUserId para devolver el plan más reciente (desc createdAt)
+- [ ] Implementar vista del learning plan en CollaboratorDetail.tsx para administradores P&C
+- [ ] Tests de integración para learning.getMyPlan y vista admin del plan

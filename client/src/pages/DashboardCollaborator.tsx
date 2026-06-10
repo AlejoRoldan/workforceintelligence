@@ -30,6 +30,7 @@ export default function DashboardCollaborator() {
 
   const { data: onboarding } = trpc.onboarding.getSession.useQuery();
   const { data: assessment } = trpc.assessment.getOrCreate.useQuery();
+  const { data: learningPlan } = trpc.learning.getMyPlan.useQuery();
 
   const radarScores = (assessment?.radarScores as RadarScore[]) ?? [];
   const onboardingStatus = onboarding?.status ?? "pending";
@@ -60,7 +61,7 @@ export default function DashboardCollaborator() {
         </div>
 
         {/* Status cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {/* Onboarding card */}
           <Card className="card-soft border-border">
             <CardContent className="pt-5">
@@ -117,6 +118,46 @@ export default function DashboardCollaborator() {
                 onClick={() => navigate("/proof-of-skills")}
               >
                 {assessmentStatus === "completed" ? "Ver Resultados" : assessmentStatus === "in_progress" ? "Continuar" : "Comenzar"}
+                <ArrowRight size={14} className="ml-1.5" />
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Learning Path card */}
+          <Card className="card-soft border-border">
+            <CardContent className="pt-5">
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-10 h-10 rounded-lg bg-amber-100 flex items-center justify-center">
+                  <Sparkles size={18} className="text-amber-600" />
+                </div>
+                {learningPlan?.plan ? (
+                  <Badge className="text-xs bg-emerald-50 text-emerald-700 border-emerald-200">
+                    <CheckCircle2 size={11} className="mr-1" />
+                    Activo
+                  </Badge>
+                ) : (
+                  <Badge className="text-xs bg-muted text-muted-foreground border-border">
+                    <Clock size={11} className="mr-1" />
+                    Pendiente
+                  </Badge>
+                )}
+              </div>
+              <h3 className="font-semibold text-foreground mb-1">Ruta de Aprendizaje</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                {learningPlan?.plan
+                  ? `${learningPlan.plan.domains.flatMap(d => d.actions).filter(a => a.completed).length}/${learningPlan.plan.totalActions} acciones completadas`
+                  : assessmentStatus === "completed"
+                  ? "Tu evaluación está lista. Genera tu plan personalizado."
+                  : "Completa el Proof of Skills para desbloquear tu ruta."}
+              </p>
+              <Button
+                size="sm"
+                disabled={assessmentStatus !== "completed"}
+                className={`btn-press w-full ${assessmentStatus === "completed" ? "bg-primary hover:bg-primary/90 text-primary-foreground" : ""}`}
+                variant={assessmentStatus !== "completed" ? "outline" : "default"}
+                onClick={() => navigate("/learning-path")}
+              >
+                {learningPlan?.plan ? "Ver mi Plan" : "Generar Plan"}
                 <ArrowRight size={14} className="ml-1.5" />
               </Button>
             </CardContent>

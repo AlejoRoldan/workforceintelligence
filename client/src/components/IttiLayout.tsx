@@ -12,6 +12,7 @@ import {
   LogOut,
   ChevronRight,
   Settings,
+  Sparkles,
 } from "lucide-react";
 
 interface NavItem {
@@ -25,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Mi Dashboard", icon: LayoutDashboard, roles: ["user"] },
   { href: "/onboarding", label: "Onboarding AI", icon: MessageSquare, roles: ["user"] },
   { href: "/proof-of-skills", label: "Proof of Skills", icon: Target, roles: ["user"] },
+  { href: "/learning-path", label: "Ruta de Aprendizaje", icon: Sparkles, roles: ["user"] },
   { href: "/dashboard/admin", label: "Dashboard P&C", icon: BarChart3, roles: ["admin"] },
 ];
 

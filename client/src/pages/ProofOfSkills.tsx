@@ -170,7 +170,11 @@ export default function ProofOfSkills() {
                 <RotateCcw size={14} className="mr-1.5" />
                 Repetir
               </Button>
-              <Button size="sm" className="btn-press bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => navigate("/dashboard")}>
+              <Button size="sm" className="btn-press bg-primary hover:bg-primary/90 text-primary-foreground" onClick={() => navigate("/learning-path")}>
+                <Sparkles size={14} className="mr-1.5" />
+                Mi Ruta de Aprendizaje
+              </Button>
+              <Button size="sm" variant="outline" className="btn-press" onClick={() => navigate("/dashboard")}>
                 Ver Dashboard
                 <ArrowRight size={14} className="ml-1.5" />
               </Button>

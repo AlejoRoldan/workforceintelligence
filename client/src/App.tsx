@@ -10,6 +10,7 @@ import ProofOfSkills from "./pages/ProofOfSkills";
 import DashboardCollaborator from "./pages/DashboardCollaborator";
 import DashboardAdmin from "./pages/DashboardAdmin";
 import CollaboratorDetail from "./pages/CollaboratorDetail";
+import LearningPath from "./pages/LearningPath";
 import IttiLayout from "./components/IttiLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 import { getLoginUrl } from "./const";
@@ -17,7 +18,7 @@ import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
 
 // Routes that require the sidebar layout
-const DASHBOARD_ROUTES = ["/dashboard", "/onboarding", "/proof-of-skills", "/dashboard/admin"];
+const DASHBOARD_ROUTES = ["/dashboard", "/onboarding", "/proof-of-skills", "/dashboard/admin", "/learning-path"];
 
 function ProtectedRoute({
   component: Component,
@@ -71,6 +72,7 @@ function AppRouter() {
           <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} />} />
           <Route path="/proof-of-skills" component={() => <ProtectedRoute component={ProofOfSkills} />} />
           <Route path="/dashboard/admin" component={() => <ProtectedRoute component={DashboardAdmin} adminOnly />} />
+          <Route path="/learning-path" component={() => <ProtectedRoute component={LearningPath} />} />
           <Route path="/dashboard/admin/collaborator/:id" component={({ params }) => {
             const userId = parseInt(params?.id ?? "0");
             if (!userId) return <NotFound />;

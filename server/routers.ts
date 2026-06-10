@@ -242,6 +242,109 @@ export const appRouter = router({
     }),
   }),
 
+  // ─── Learning Paths ───────────────────────────────────────────────────────────────
+  learning: router({
+    // Generates a personalized learning plan post-assessment.
+    // Idempotent: if a plan already exists for this assessment, returns it.
+    generate: protectedProcedure.mutation(async ({ ctx }) => {
+      const {
+        getLearningPlanByUserAndAssessment,
+        createLearningPlan,
+        saveLearningPlan,
+      } = await import("./repositories/learning.repository");
+      const { generateLearningPlan, hasSignificantGaps } = await import("./services/learning.service");
+      const { getExpectationsForRole, normalizeRole: nr } = await import("./repositories/competency.repository");
+
+      const assessment = await getAssessmentByUserId(ctx.user.id);
+      if (!assessment || assessment.status !== "completed") {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Debes completar la evaluación antes de generar tu ruta de aprendizaje." });
+      }
+
+      // Idempotency: return existing plan if already generated
+      const existing = await getLearningPlanByUserAndAssessment(ctx.user.id, assessment.id);
+      if (existing && existing.status !== "generating" && existing.planJson) {
+        return existing.planJson;
+      }
+
+      const radarScores = (assessment.radarScores ?? []) as RadarScore[];
+      if (!hasSignificantGaps(radarScores)) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Tu perfil ya cumple todas las expectativas del rol. ¡Excelente trabajo!" });
+      }
+
+      // Enrich radar scores with role expectations (domainId → domainName join)
+      const role = nr(ctx.user.jobTitle ?? "");
+      const expectations = await getExpectationsForRole(role);
+      const { getAllDomains } = await import("./repositories/competency.repository");
+      const allDomainsForPlan = await getAllDomains();
+      const domainIdToName = new Map(allDomainsForPlan.map((d) => [d.id, d.name]));
+      const enrichedScores = radarScores.map((r) => {
+        const exp = expectations.find((e) => domainIdToName.get(e.domainId) === r.domain);
+        return { ...r, expected: exp?.expectedScore ?? r.expected ?? 70 };
+      });
+
+      // Create placeholder row
+      const planId = existing?.id ?? await createLearningPlan(ctx.user.id, assessment.id);
+
+      // Generate plan with AI
+      const plan = await generateLearningPlan({
+        collaboratorName: ctx.user.name ?? "Colaborador",
+        jobTitle: ctx.user.jobTitle ?? "Colaborador",
+        department: ctx.user.department ?? "General",
+        radarScores: enrichedScores,
+        assessmentSummary: assessment.summary ?? "",
+      });
+
+      await saveLearningPlan(planId, plan);
+
+      auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "assessment.submitted", "learning_plan", planId));
+
+      return plan;
+    }),
+
+    // Returns the collaborator's current learning plan.
+    getMyPlan: protectedProcedure.query(async ({ ctx }) => {
+      const { getLearningPlanByUserId } = await import("./repositories/learning.repository");
+      const row = await getLearningPlanByUserId(ctx.user.id);
+      if (!row) return null;
+      return { id: row.id, status: row.status, plan: row.planJson as import("../drizzle/schema").LearningPlan | null, generatedAt: row.generatedAt };
+    }),
+
+    // Marks a specific action as completed/uncompleted.
+    updateActionStatus: protectedProcedure
+      .input(z.object({
+        planId: z.number(),
+        domainName: z.string(),
+        actionId: z.string(),
+        completed: z.boolean(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { markActionCompleted, getLearningPlanById } = await import("./repositories/learning.repository");
+
+        // Verify ownership
+        const row = await getLearningPlanById(input.planId);
+        if (!row || row.userId !== ctx.user.id) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "No tienes permiso para modificar este plan." });
+        }
+
+        const updatedPlan = await markActionCompleted(input.planId, input.domainName, input.actionId, input.completed);
+        if (!updatedPlan) throw new TRPCError({ code: "NOT_FOUND", message: "Acción no encontrada." });
+
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "user.profile_updated", "learning_action", input.planId, { actionId: input.actionId, completed: input.completed }));
+
+        return updatedPlan;
+      }),
+
+    // Admin: get learning plan for a specific collaborator
+    getCollaboratorPlan: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ ctx: _ctx, input }) => {
+        const { getLearningPlanByUserId } = await import("./repositories/learning.repository");
+        const row = await getLearningPlanByUserId(input.userId);
+        if (!row) return null;
+        return { id: row.id, status: row.status, plan: row.planJson as import("../drizzle/schema").LearningPlan | null, generatedAt: row.generatedAt };
+      }),
+  }),
+
   // ─── Admin / P&C Dashboard ──────────────────────────────────────────────────
   admin: router({
     getStats: adminProcedure.query(async ({ ctx }) => {
