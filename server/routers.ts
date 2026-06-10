@@ -34,8 +34,15 @@ import {
   invokeOnboardingChat,
   generateAssessmentQuestions,
   generateAssessmentSummary,
+  extractProfileFromConversation,
 } from "./services/llm.service";
 import { evaluateAllAnswers } from "./services/scoring.service";
+import {
+  getExpectationsForRole,
+  normalizeRole,
+  getDomainByName,
+  saveEvidence,
+} from "./repositories/competency.repository";
 import { auditLog, createAuditEntry } from "./services/audit.service";
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
@@ -110,12 +117,8 @@ export const appRouter = router({
         await saveOnboardingMessages(session.id, finalHistory, newStatus);
 
         if (isComplete) {
-          // Extract profile from conversation — AI-driven, no random values
-          const profileScores: Record<string, number> = {};
-          for (const domain of MACRO_DOMAINS) {
-            // Default to 0; Sprint 2 will extract real scores from conversation
-            profileScores[domain] = 0;
-          }
+          // Sprint 2: Extract real profile from conversation using AI structured output
+          const profileScores = await extractProfileFromConversation(finalHistory);
           await saveOnboardingProfile(session.id, profileScores);
           auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "onboarding.completed", "onboarding_session", session.id));
         } else if (history.length === 0) {
@@ -172,10 +175,27 @@ export const appRouter = router({
           throw new TRPCError({ code: "BAD_REQUEST", message: "La evaluación ya fue completada." });
         }
 
+        // Sprint 2: Load role-specific expectations from DB instead of static defaults
+        const jobTitle = ctx.user.jobTitle ?? "Default";
+        const dbExpectations = await getExpectationsForRole(jobTitle);
+
+        // Build expected scores map from DB; fall back to DEFAULT_EXPECTED_SCORES
+        const expectedScores: Record<string, number> = { ...DEFAULT_EXPECTED_SCORES };
+        if (dbExpectations.length > 0) {
+          // We need domain names — load all domains once
+          const { getAllDomains } = await import("./repositories/competency.repository");
+          const domains = await getAllDomains();
+          const domainMap = new Map(domains.map((d) => [d.id, d.name]));
+          for (const exp of dbExpectations) {
+            const domainName = domainMap.get(exp.domainId);
+            if (domainName) expectedScores[domainName] = exp.expectedScore;
+          }
+        }
+
         const { answers, radarScores, overallScore } = await evaluateAllAnswers(
           assessment.questions,
           input.answers,
-          DEFAULT_EXPECTED_SCORES
+          expectedScores
         );
 
         const summary = await generateAssessmentSummary(
@@ -184,6 +204,27 @@ export const appRouter = router({
         );
 
         await saveAssessmentResults(assessment.id, answers, radarScores, overallScore, summary);
+
+        // Sprint 2: Persist competency evidence per answer for audit trail
+        const { getAllDomains: getDomains } = await import("./repositories/competency.repository");
+        const allDomains = await getDomains();
+        const domainIdMap = new Map(allDomains.map((d) => [d.name, d.id]));
+        for (const ans of answers) {
+          const question = assessment.questions?.find((q) => q.id === ans.questionId);
+          if (!question) continue;
+          const domainId = domainIdMap.get(question.macroDomain);
+          if (!domainId) continue;
+          await saveEvidence({
+            assessmentId: assessment.id,
+            domainId,
+            questionId: ans.questionId,
+            evidence: ans.evidence,
+            confidence: ans.confidence,
+            rationale: ans.rationale,
+            score: ans.score,
+          });
+        }
+
         auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "assessment.submitted", "assessment", assessment.id, { overallScore }));
 
         return { radarScores, overallScore, summary, answers };

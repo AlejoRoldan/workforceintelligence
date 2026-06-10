@@ -218,6 +218,69 @@ export default function DashboardCollaborator() {
           </div>
         )}
 
+        {/* Role expectations gap table — Sprint 2: shows expected vs actual per domain */}
+        {assessmentStatus === "completed" && radarScores.length > 0 && (
+          <Card className="card-soft border-border">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Target size={15} className="text-primary" />
+                Expectativas por Rol vs. Mi Nivel Actual
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">
+                Comparación entre el nivel esperado para tu rol y tu resultado en cada Macro Dominio.
+              </p>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="space-y-3">
+                {radarScores.map((r) => {
+                  const gap = r.score - r.expected;
+                  const pct = Math.round((r.score / 100) * 100);
+                  const expPct = Math.round((r.expected / 100) * 100);
+                  const severity =
+                    gap >= 10 ? "exceeds" :
+                    gap >= -5 ? "on-track" :
+                    gap >= -20 ? "moderate" : "critical";
+                  const severityConfig = {
+                    exceeds: { label: "Supera", bar: "bg-emerald-500", text: "text-emerald-700" },
+                    "on-track": { label: "En nivel", bar: "bg-primary", text: "text-primary" },
+                    moderate: { label: "Brecha moderada", bar: "bg-amber-500", text: "text-amber-700" },
+                    critical: { label: "Brecha crítica", bar: "bg-rose-500", text: "text-rose-600" },
+                  }[severity];
+                  return (
+                    <div key={r.domain} className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-medium text-foreground">{r.domain}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs text-muted-foreground">Esperado: {r.expected}</span>
+                          <Badge className={`text-xs border ${severityConfig.text} bg-transparent`}>
+                            {severityConfig.label}
+                          </Badge>
+                          <span className="text-xs font-semibold text-foreground">{r.score}/100</span>
+                        </div>
+                      </div>
+                      <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                        {/* Expected marker */}
+                        <div
+                          className="absolute top-0 h-full w-0.5 bg-foreground/30 z-10"
+                          style={{ left: `${expPct}%` }}
+                        />
+                        {/* Actual score bar */}
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${severityConfig.bar}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-3">
+                La línea vertical indica el nivel esperado para tu rol. La barra de color muestra tu nivel actual.
+              </p>
+            </CardContent>
+          </Card>
+        )}
+
         {/* Empty state if nothing done */}
         {onboardingStatus === "pending" && assessmentStatus === "pending" && (
           <Card className="card-soft border-dashed border-2 border-border">

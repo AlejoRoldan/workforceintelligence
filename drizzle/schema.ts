@@ -29,14 +29,11 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 // ─── Onboarding Sessions ──────────────────────────────────────────────────────
-// Each collaborator has one onboarding session. Messages are stored as JSON.
 export const onboardingSessions = mysqlTable("onboarding_sessions", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   status: mysqlEnum("status", ["pending", "in_progress", "completed"]).default("pending").notNull(),
-  // JSON array of { role: "user"|"assistant", content: string }
   messages: json("messages").$type<{ role: string; content: string }[]>(),
-  // Extracted competency profile from onboarding conversation
   competencyProfile: json("competencyProfile").$type<Record<string, number>>(),
   completedAt: timestamp("completedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -50,15 +47,10 @@ export const competencyAssessments = mysqlTable("competency_assessments", {
   id: int("id").autoincrement().primaryKey(),
   userId: int("userId").notNull(),
   status: mysqlEnum("status", ["pending", "in_progress", "completed"]).default("pending").notNull(),
-  // Generated questions: JSON array of { id, question, macroDomain, competencyLayer, options?, type }
   questions: json("questions").$type<AssessmentQuestion[]>(),
-  // User answers: JSON array of { questionId, answer, score, feedback }
   answers: json("answers").$type<AssessmentAnswer[]>(),
-  // Final radar scores per macro domain (0-100)
   radarScores: json("radarScores").$type<RadarScore[]>(),
-  // Overall score 0-100
   overallScore: float("overallScore"),
-  // AI-generated narrative summary
   summary: text("summary"),
   completedAt: timestamp("completedAt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -66,6 +58,59 @@ export const competencyAssessments = mysqlTable("competency_assessments", {
 });
 
 export type CompetencyAssessment = typeof competencyAssessments.$inferSelect;
+
+// ─── Competency Domains ───────────────────────────────────────────────────────
+// Catalog of the 6 strategic macro domains. Seeded at startup, configurable by admin.
+export const competencyDomains = mysqlTable("competency_domains", {
+  id: int("id").autoincrement().primaryKey(),
+  name: varchar("name", { length: 128 }).notNull().unique(),
+  description: text("description"),
+  competencyLayer: mysqlEnum("competencyLayer", [
+    "Organizacionales",
+    "Liderazgo",
+    "Funcionales",
+    "Estratégicas Futuras",
+  ]).notNull(),
+  active: boolean("active").default(true).notNull(),
+  displayOrder: int("displayOrder").default(0).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CompetencyDomain = typeof competencyDomains.$inferSelect;
+export type InsertCompetencyDomain = typeof competencyDomains.$inferInsert;
+
+// ─── Role Skill Expectations ──────────────────────────────────────────────────
+// Expected score per domain per job role. Enables gap analysis per collaborator.
+export const roleSkillExpectations = mysqlTable("role_skill_expectations", {
+  id: int("id").autoincrement().primaryKey(),
+  roleName: varchar("roleName", { length: 128 }).notNull(),
+  domainId: int("domainId").notNull(),
+  expectedScore: int("expectedScore").notNull(),  // 0–100
+  weight: float("weight").default(1.0).notNull(), // relative importance for overall score
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type RoleSkillExpectation = typeof roleSkillExpectations.$inferSelect;
+export type InsertRoleSkillExpectation = typeof roleSkillExpectations.$inferInsert;
+
+// ─── Competency Evidence ──────────────────────────────────────────────────────
+// Stores AI-extracted evidence per answer, linked to an assessment.
+export const competencyEvidence = mysqlTable("competency_evidence", {
+  id: int("id").autoincrement().primaryKey(),
+  assessmentId: int("assessmentId").notNull(),
+  domainId: int("domainId").notNull(),
+  questionId: varchar("questionId", { length: 32 }).notNull(),
+  evidence: json("evidence").$type<string[]>(),   // key phrases extracted by AI
+  confidence: float("confidence").notNull(),       // 0–1
+  rationale: text("rationale"),                   // AI explanation
+  score: int("score").notNull(),                  // 0–100
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CompetencyEvidence = typeof competencyEvidence.$inferSelect;
+export type InsertCompetencyEvidence = typeof competencyEvidence.$inferInsert;
 
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 export type MacroDomain =
@@ -94,12 +139,15 @@ export interface AssessmentQuestion {
 export interface AssessmentAnswer {
   questionId: string;
   answer: string;
-  score: number; // 0-100
+  score: number;
+  confidence: number;
+  evidence: string[];
+  rationale: string;
   feedback: string;
 }
 
 export interface RadarScore {
   domain: MacroDomain;
-  score: number;       // 0-100 actual
-  expected: number;    // 0-100 expected for role
+  score: number;
+  expected: number;
 }

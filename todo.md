@@ -59,7 +59,7 @@
 - [ ] Evaluación AI incremental por respuesta durante la prueba
 
 ## GitHub
-- [ ] Subir código al repositorio AlejoRoldan/workforceintelligence
+- [x] Subir código al repositorio AlejoRoldan/workforceintelligence
 
 ## Sprint 1 — Estabilización (RFC-001)
 - [x] Crear shared/competency.ts como fuente única de tipos y constantes
@@ -74,3 +74,16 @@
 - [x] Refactorizar server/routers.ts para delegar a servicios y repositorios
 - [x] 17 tests pasando (scoring, audit, permissions, auth, RBAC, rate limit)
 - [x] 0 errores TypeScript
+
+## Sprint 2 — Competency Engine (RFC-001)
+- [x] Agregar tabla competency_domains al schema
+- [x] Agregar tabla role_skill_expectations al schema
+- [x] Agregar tabla competency_evidence al schema
+- [x] Migrar y aplicar SQL de las nuevas tablas
+- [x] Poblar competency_domains con los 6 Macro Dominios por defecto
+- [x] Crear server/repositories/competency.repository.ts
+- [x] Implementar extracción real del perfil desde conversación de onboarding (LLM structured output)
+- [x] Conectar scoring de assessment con expectativas por rol (role_skill_expectations)
+- [x] Guardar competency_evidence por cada respuesta evaluada
+- [x] Actualizar Dashboard Colaborador para mostrar expectativas por rol
+- [x] Tests del Competency Engine (extracción, scoring con expectativas, evidence)

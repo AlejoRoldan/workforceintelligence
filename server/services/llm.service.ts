@@ -199,6 +199,76 @@ Responde ÚNICAMENTE con JSON válido.`;
   }
 }
 
+// ─── Profile extraction from onboarding conversation ────────────────────────
+
+/**
+ * Extracts a structured competency profile from the full onboarding conversation.
+ * Returns a score (0–100) per Macro Domain based on signals detected in the chat.
+ * This replaces the previous placeholder zeros.
+ */
+export async function extractProfileFromConversation(
+  messages: { role: string; content: string }[]
+): Promise<Record<string, number>> {
+  const conversationText = messages
+    .filter((m) => m.role !== "system")
+    .map((m) => `${m.role === "user" ? "Colaborador" : "Agente"}: ${m.content}`)
+    .join("\n");
+
+  const PROFILE_SCHEMA = {
+    type: "object",
+    properties: {
+      "Digital & GenAI": { type: "number" },
+      "Liderazgo Moderno": { type: "number" },
+      "Operación Ágil": { type: "number" },
+      "Customer Experience": { type: "number" },
+      "Data-driven": { type: "number" },
+      "Innovación": { type: "number" },
+    },
+    required: ["Digital & GenAI", "Liderazgo Moderno", "Operación Ágil", "Customer Experience", "Data-driven", "Innovación"],
+    additionalProperties: false,
+  };
+
+  const prompt = `Analiza esta conversación de onboarding y estima el nivel de competencia inicial (0-100) del colaborador en cada uno de los 6 Macro Dominios estratégicos, basándote en las señales, experiencias y conocimientos mencionados:
+
+${conversationText}
+
+Devuelve ÚNICAMENTE un JSON con los 6 dominios y sus puntajes estimados (0-100). Si no hay señales suficientes para un dominio, asigna 50 como valor neutro.`;
+
+  try {
+    const response = await invokeLLM({
+      messages: [{ role: "user", content: prompt }],
+      response_format: {
+        type: "json_schema",
+        json_schema: {
+          name: "competency_profile",
+          strict: true,
+          schema: PROFILE_SCHEMA,
+        },
+      },
+    });
+
+    const raw = response.choices[0]?.message?.content;
+    const parsed = JSON.parse(typeof raw === "string" ? raw : "{}");
+
+    // Validate and clamp all values to 0–100
+    const profile: Record<string, number> = {};
+    for (const domain of ["Digital & GenAI", "Liderazgo Moderno", "Operación Ágil", "Customer Experience", "Data-driven", "Innovación"]) {
+      profile[domain] = Math.min(100, Math.max(0, Number(parsed[domain]) || 50));
+    }
+    return profile;
+  } catch {
+    // Neutral fallback — all domains at 50
+    return {
+      "Digital & GenAI": 50,
+      "Liderazgo Moderno": 50,
+      "Operación Ágil": 50,
+      "Customer Experience": 50,
+      "Data-driven": 50,
+      "Innovación": 50,
+    };
+  }
+}
+
 // ─── Narrative summary ────────────────────────────────────────────────────────
 
 export async function generateAssessmentSummary(
