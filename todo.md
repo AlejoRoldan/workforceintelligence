@@ -60,3 +60,17 @@
 
 ## GitHub
 - [ ] Subir código al repositorio AlejoRoldan/workforceintelligence
+
+## Sprint 1 — Estabilización (RFC-001)
+- [x] Crear shared/competency.ts como fuente única de tipos y constantes
+- [x] Crear server/services/llm.service.ts con todos los prompts centralizados
+- [x] Crear server/services/scoring.service.ts — motor de scoring sin Math.random()
+- [x] Crear server/services/audit.service.ts con registro estructurado JSON
+- [x] Crear server/repositories/onboarding.repository.ts
+- [x] Crear server/repositories/assessment.repository.ts
+- [x] Crear server/repositories/user.repository.ts
+- [x] Crear server/middleware/rate-limit.ts (API: 120 req/min, LLM: 20 req/min)
+- [x] Crear server/middleware/permissions.ts con adminProcedure y assertOwnerOrAdmin
+- [x] Refactorizar server/routers.ts para delegar a servicios y repositorios
+- [x] 17 tests pasando (scoring, audit, permissions, auth, RBAC, rate limit)
+- [x] 0 errores TypeScript
