@@ -145,3 +145,19 @@
 - [x] Implementar vista del learning plan en CollaboratorDetail.tsx para administradores P&C
 - [x] Tests de integración para learning.getMyPlan y admin.getCollaboratorPlan (29 tests en debt-closure.test.ts)
 - [x] 121 tests pasando en 7 archivos, 0 errores TypeScript
+
+## Sprint UX/UI — Componentes Modernos y Microinteracciones
+- [x] Crear componente NumberTicker (contador animado con framer-motion)
+- [x] Crear componente AnimatedProgressBar (barra con animación de entrada)
+- [x] Crear componente GlassCard (card con glassmorphism)
+- [x] Crear componente PageTransition (wrapper AnimatePresence para rutas)
+- [x] Crear componente StaggerContainer/StaggerItem para listas en cascada
+- [x] Refactorizar Dashboard Admin: Bento Grid, KPI counters animados, glassmorphism
+- [x] Refactorizar Dashboard Colaborador: progress bars animadas, motion depth
+- [x] Mejorar CollaboratorDetail: progress bars animadas, stagger en brechas
+- [x] Mejorar IttiLayout: sidebar con microinteracciones, indicador activo animado
+- [x] Agregar transiciones de página con AnimatePresence en App.tsx
+- [x] Agregar clases CSS: .glass, .shimmer, .bento-card, .tabular-nums, prefers-reduced-motion
+- [x] Verificar TypeScript (0 errores)
+- [x] Ejecutar 121 tests (todos pasando)
+- [x] Checkpoint y push a GitHub

@@ -16,6 +16,7 @@ import { useAuth } from "./_core/hooks/useAuth";
 import { getLoginUrl } from "./const";
 import { Loader2 } from "lucide-react";
 import { useEffect } from "react";
+import { AnimatePresence } from "framer-motion";
 
 // Routes that require the sidebar layout
 const DASHBOARD_ROUTES = ["/dashboard", "/onboarding", "/proof-of-skills", "/dashboard/admin", "/learning-path"];
@@ -67,24 +68,26 @@ function AppRouter() {
   if (isDashboard) {
     return (
       <IttiLayout>
-        <Switch>
-          <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardCollaborator} />} />
-          <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} />} />
-          <Route path="/proof-of-skills" component={() => <ProtectedRoute component={ProofOfSkills} />} />
-          <Route path="/dashboard/admin" component={() => <ProtectedRoute component={DashboardAdmin} adminOnly />} />
-          <Route path="/learning-path" component={() => <ProtectedRoute component={LearningPath} />} />
-          <Route path="/dashboard/admin/collaborator/:id" component={({ params }) => {
-            const userId = parseInt(params?.id ?? "0");
-            if (!userId) return <NotFound />;
-            return (
-              <ProtectedRoute
-                component={() => <CollaboratorDetail userId={userId} />}
-                adminOnly
-              />
-            );
-          }} />
-          <Route component={NotFound} />
-        </Switch>
+        <AnimatePresence mode="wait" initial={false}>
+          <Switch key={location}>
+            <Route path="/dashboard" component={() => <ProtectedRoute component={DashboardCollaborator} />} />
+            <Route path="/onboarding" component={() => <ProtectedRoute component={Onboarding} />} />
+            <Route path="/proof-of-skills" component={() => <ProtectedRoute component={ProofOfSkills} />} />
+            <Route path="/dashboard/admin" component={() => <ProtectedRoute component={DashboardAdmin} adminOnly />} />
+            <Route path="/learning-path" component={() => <ProtectedRoute component={LearningPath} />} />
+            <Route path="/dashboard/admin/collaborator/:id" component={({ params }) => {
+              const userId = parseInt(params?.id ?? "0");
+              if (!userId) return <NotFound />;
+              return (
+                <ProtectedRoute
+                  component={() => <CollaboratorDetail userId={userId} />}
+                  adminOnly
+                />
+              );
+            }} />
+            <Route component={NotFound} />
+          </Switch>
+        </AnimatePresence>
       </IttiLayout>
     );
   }
