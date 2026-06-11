@@ -149,6 +149,40 @@ export const notifications = mysqlTable("notifications", {
 export type Notification = typeof notifications.$inferSelect;
 export type InsertNotification = typeof notifications.$inferInsert;
 
+// ─── User Invitations ───────────────────────────────────────────────────────
+// Admin-generated invitation links for onboarding new collaborators.
+export const userInvitations = mysqlTable("user_invitations", {
+  id: int("id").autoincrement().primaryKey(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  email: varchar("email", { length: 320 }),
+  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  invitedBy: int("invitedBy").notNull(),       // admin userId who created it
+  note: text("note"),                           // optional message for the invitee
+  usedAt: timestamp("usedAt"),                  // null = not yet used
+  usedByUserId: int("usedByUserId"),            // userId who redeemed it
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type UserInvitation = typeof userInvitations.$inferSelect;
+export type InsertUserInvitation = typeof userInvitations.$inferInsert;
+
+// ─── Assessment History ───────────────────────────────────────────────────────
+// Snapshot of each completed assessment for longitudinal tracking.
+export const assessmentHistory = mysqlTable("assessment_history", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  assessmentId: int("assessmentId").notNull(),
+  overallScore: float("overallScore").notNull(),
+  radarScores: json("radarScores").$type<RadarScore[]>(),
+  summary: text("summary"),
+  completedAt: timestamp("completedAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type AssessmentHistoryRow = typeof assessmentHistory.$inferSelect;
+export type InsertAssessmentHistory = typeof assessmentHistory.$inferInsert;
+
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 export type MacroDomain =
   | "Digital & GenAI"

@@ -188,3 +188,33 @@
 - [x] Ruta /dashboard/admin/team en App.tsx
 - [x] Nav item "Comparativa Equipo" en IttiLayout para admins
 - [x] 121 tests pasando (0 errores TypeScript)
+
+## Sprint D — Gestión y Administración
+
+### D1: Gestión de Usuarios
+- [x] Tabla `user_invitations` en schema.ts (token, email, role, invitedBy, expiresAt, usedAt, note)
+- [x] Migración SQL y aplicar con webdev_execute_sql
+- [x] Repositorio invitations.repository.ts (create, getAll, getPending, markUsed)
+- [x] Procedimientos tRPC: userManagement.getUsers, updateRole, createInvitation, getInvitations
+- [x] Página UserManagement.tsx con tabla de colaboradores, estado, cambio de rol e invitaciones
+- [x] Modal de invitación: generar link con token único válido 7 días
+- [x] Cambio de rol inline en la tabla (user ↔ admin)
+- [x] Ruta /dashboard/admin/users en App.tsx + nav item en sidebar
+
+### D2: Configuración de Perfiles de Cargo
+- [x] Repositorio: getAllRoleExpectations, upsertRoleExpectations, deleteRoleExpectations
+- [x] Procedimientos tRPC: roleProfiles.getAll, getDomains, upsertRole, deleteRole
+- [x] Página RoleProfiles.tsx con editor de sliders por dominio (0-100)
+- [x] Confirmación de eliminación con AlertDialog
+- [x] Ruta /dashboard/admin/role-profiles en App.tsx + nav item en sidebar
+
+### D3: Historial de Evaluaciones
+- [x] Tabla `assessment_history` en schema.ts (userId, overallScore, radarScores JSON, summary, completedAt)
+- [x] Migración SQL y aplicar con webdev_execute_sql
+- [x] Repositorio assessment-history.repository.ts (createSnapshot, getByUserId, getAll)
+- [x] Trigger: al completar assessment → guardar snapshot en assessment_history
+- [x] Procedimientos tRPC: assessmentHistory.getByUser, getMine
+- [x] Sección "Historial de Evaluaciones" en CollaboratorDetail con timeline de snapshots
+- [x] Verificar TypeScript (0 errores)
+- [x] Ejecutar 121 tests (todos pasando)
+- [x] Checkpoint y push a GitHub

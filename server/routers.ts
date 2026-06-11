@@ -50,6 +50,15 @@ import {
   markNotificationRead,
   markAllNotificationsRead,
 } from "./repositories/notifications.repository";
+import {
+  createInvitation,
+  getAllInvitations,
+  getPendingInvitations,
+} from "./repositories/invitations.repository";
+import {
+  createAssessmentSnapshot,
+  getAssessmentHistoryByUserId,
+} from "./repositories/assessment-history.repository";
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
 import { adminProcedure } from "./middleware/permissions";
@@ -238,6 +247,15 @@ export const appRouter = router({
         // Sprint A: Notify admins
         const { notifyAssessmentCompleted } = await import("./services/notifications.service");
         notifyAssessmentCompleted(ctx.user.id, ctx.user.name ?? "Colaborador", overallScore).catch(() => {});
+        // Sprint D: Save assessment history snapshot
+        createAssessmentSnapshot({
+          userId: ctx.user.id,
+          assessmentId: assessment.id,
+          overallScore,
+          radarScores,
+          summary,
+          completedAt: new Date(),
+        }).catch(() => {});
 
         return { radarScores, overallScore, summary, answers };
       }),
@@ -597,6 +615,123 @@ export const appRouter = router({
     }),
 
   // ─── Notifications ────────────────────────────────────────────────────────────────────────────
+  // User Management (Sprint D)
+  userManagement: router({
+    getUsers: adminProcedure.query(async ({ ctx }) => {
+      const allUsers = await getAllUsers();
+      const assessments = await getAllAssessments();
+      const assessmentMap = new Map(assessments.map((a) => [a.userId, a]));
+      const { getAllOnboardingSessions } = await import("./repositories/onboarding.repository");
+      const onboardings = await getAllOnboardingSessions();
+      const onboardingMap = new Map(onboardings.map((o) => [o.userId, o]));
+      auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.collaborators_viewed", "users"));
+      return allUsers
+        .filter((u) => u.role === "user")
+        .map((u) => ({
+          id: u.id,
+          name: u.name ?? "Sin nombre",
+          email: u.email ?? "",
+          jobTitle: u.jobTitle ?? "",
+          department: u.department ?? "",
+          role: u.role,
+          createdAt: u.createdAt,
+          lastSignedIn: u.lastSignedIn,
+          onboardingStatus: onboardingMap.get(u.id)?.status ?? "pending",
+          assessmentStatus: assessmentMap.get(u.id)?.status ?? "pending",
+          overallScore: assessmentMap.get(u.id)?.overallScore ?? null,
+        }));
+    }),
+    updateRole: adminProcedure
+      .input(z.object({ userId: z.number(), role: z.enum(["user", "admin"]) }))
+      .mutation(async ({ ctx, input }) => {
+        const { updateUserRole } = await import("./repositories/user.repository");
+        await updateUserRole(input.userId, input.role);
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "user.profile_updated", "user", input.userId, { newRole: input.role }));
+        return { success: true };
+      }),
+    createInvitation: adminProcedure
+      .input(z.object({
+        email: z.string().email().optional(),
+        role: z.enum(["user", "admin"]).default("user"),
+        note: z.string().max(500).optional(),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { randomBytes } = await import("crypto");
+        const token = randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        const inv = await createInvitation({
+          token,
+          email: input.email,
+          role: input.role,
+          invitedBy: ctx.user.id,
+          note: input.note,
+          expiresAt,
+        });
+        if (inv) auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.stats_viewed", "invitation", inv.id));
+        return { token, expiresAt };
+      }),
+    getInvitations: adminProcedure.query(async () => getAllInvitations()),
+    getPendingInvitations: adminProcedure.query(async () => getPendingInvitations()),
+  }),
+
+  // Role Profiles (Sprint D)
+  roleProfiles: router({
+    getAll: adminProcedure.query(async () => {
+      const { getAllRoleExpectations, getAllDomains } = await import("./repositories/competency.repository");
+      const expectations = await getAllRoleExpectations();
+      const domains = await getAllDomains();
+      const domainMap = new Map(domains.map((d) => [d.id, d.name]));
+      const roleMap = new Map<string, Array<{ domainId: number; domainName: string; expectedScore: number; weight: number }>>();
+      for (const exp of expectations) {
+        if (!roleMap.has(exp.roleName)) roleMap.set(exp.roleName, []);
+        roleMap.get(exp.roleName)!.push({
+          domainId: exp.domainId,
+          domainName: domainMap.get(exp.domainId) ?? "Desconocido",
+          expectedScore: exp.expectedScore,
+          weight: exp.weight,
+        });
+      }
+      return Array.from(roleMap.entries()).map(([roleName, doms]) => ({ roleName, domains: doms }));
+    }),
+    getDomains: adminProcedure.query(async () => {
+      const { getAllDomains } = await import("./repositories/competency.repository");
+      return getAllDomains();
+    }),
+    upsertRole: adminProcedure
+      .input(z.object({
+        roleName: z.string().min(1).max(128),
+        expectations: z.array(z.object({
+          domainId: z.number(),
+          expectedScore: z.number().min(0).max(100),
+          weight: z.number().min(0.1).max(5).default(1.0),
+        })),
+      }))
+      .mutation(async ({ ctx, input }) => {
+        const { upsertRoleExpectations } = await import("./repositories/competency.repository");
+        await upsertRoleExpectations(input.roleName, input.expectations);
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.stats_viewed", "role_profile", undefined, { roleName: input.roleName }));
+        return { success: true };
+      }),
+    deleteRole: adminProcedure
+      .input(z.object({ roleName: z.string() }))
+      .mutation(async ({ ctx, input }) => {
+        const { deleteRoleExpectations } = await import("./repositories/competency.repository");
+        await deleteRoleExpectations(input.roleName);
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.stats_viewed", "role_profile", undefined, { deleted: input.roleName }));
+        return { success: true };
+      }),
+  }),
+
+  // Assessment History (Sprint D)
+  assessmentHistory: router({
+    getByUser: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ input }) => getAssessmentHistoryByUserId(input.userId)),
+    getMine: protectedProcedure.query(async ({ ctx }) =>
+      getAssessmentHistoryByUserId(ctx.user.id)
+    ),
+  }),
+
   notifications: router({
     /** Get unread count + list for the current admin user */
     getUnread: protectedProcedure.query(async ({ ctx }) => {

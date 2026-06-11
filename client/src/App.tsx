@@ -12,6 +12,8 @@ import DashboardAdmin from "./pages/DashboardAdmin";
 import CollaboratorDetail from "./pages/CollaboratorDetail";
 import LearningPath from "./pages/LearningPath";
 import TeamComparison from "./pages/TeamComparison";
+import UserManagement from "./pages/UserManagement";
+import RoleProfiles from "./pages/RoleProfiles";
 import IttiLayout from "./components/IttiLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 import { getLoginUrl } from "./const";
@@ -20,7 +22,7 @@ import { useEffect } from "react";
 import { AnimatePresence } from "framer-motion";
 
 // Routes that require the sidebar layout
-const DASHBOARD_ROUTES = ["/dashboard", "/onboarding", "/proof-of-skills", "/dashboard/admin", "/learning-path", "/dashboard/admin/team"];
+const DASHBOARD_ROUTES = ["/dashboard", "/onboarding", "/proof-of-skills", "/dashboard/admin", "/learning-path", "/dashboard/admin/team", "/dashboard/admin/users", "/dashboard/admin/role-profiles"];
 
 function ProtectedRoute({
   component: Component,
@@ -77,6 +79,8 @@ function AppRouter() {
             <Route path="/dashboard/admin" component={() => <ProtectedRoute component={DashboardAdmin} adminOnly />} />
             <Route path="/learning-path" component={() => <ProtectedRoute component={LearningPath} />} />
             <Route path="/dashboard/admin/team" component={() => <ProtectedRoute component={TeamComparison} adminOnly />} />
+            <Route path="/dashboard/admin/users" component={() => <ProtectedRoute component={UserManagement} adminOnly />} />
+            <Route path="/dashboard/admin/role-profiles" component={() => <ProtectedRoute component={RoleProfiles} adminOnly />} />
             <Route path="/dashboard/admin/collaborator/:id" component={({ params }) => {
               const userId = parseInt(params?.id ?? "0");
               if (!userId) return <NotFound />;

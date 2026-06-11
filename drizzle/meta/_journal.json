@@ -43,6 +43,13 @@
       "when": 1781209745183,
       "tag": "0005_organic_vampiro",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1781211093450,
+      "tag": "0006_pale_satana",
+      "breakpoints": true
     }
   ]
 }

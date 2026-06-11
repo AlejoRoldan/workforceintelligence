@@ -18,6 +18,8 @@ import {
   ChevronRight,
   Sparkles,
   Users,
+  UserCog,
+  Briefcase,
 } from "lucide-react";
 import NotificationBell from "./NotificationBell";
 
@@ -35,6 +37,8 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/learning-path", label: "Ruta de Aprendizaje", icon: Sparkles, roles: ["user"] },
   { href: "/dashboard/admin", label: "Dashboard P&C", icon: BarChart3, roles: ["admin"] },
   { href: "/dashboard/admin/team", label: "Comparativa Equipo", icon: Users, roles: ["admin"] },
+  { href: "/dashboard/admin/users", label: "Gestión de Usuarios", icon: UserCog, roles: ["admin"] },
+  { href: "/dashboard/admin/role-profiles", label: "Perfiles de Cargo", icon: Briefcase, roles: ["admin"] },
 ];
 
 // Variantes de animación para los nav items en stagger

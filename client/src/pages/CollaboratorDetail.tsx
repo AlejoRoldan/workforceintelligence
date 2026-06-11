@@ -33,6 +33,76 @@ import {
   Download,
 } from "lucide-react";
 
+// ─── Assessment History Section ────────────────────────────────────────────────────────────────────────────────────
+function AssessmentHistorySection({ userId }: { userId: number }) {
+  const { data: history = [] } = trpc.assessmentHistory.getByUser.useQuery({ userId });
+
+  if (history.length === 0) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.4 }}
+    >
+      <Card className="card-soft border-border">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-sm flex items-center gap-2">
+            <BarChart3 size={15} className="text-primary" />
+            Historial de Evaluaciones
+            <Badge variant="outline" className="text-xs ml-auto">{history.length} evaluación{history.length !== 1 ? "es" : ""}</Badge>
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {history.map((entry, idx) => {
+            const scores = (entry.radarScores ?? []) as Array<{ domain: string; score: number; expected: number }>;
+            return (
+              <div key={entry.id} className="p-3 rounded-lg bg-muted/40 border border-border">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                      idx === 0 ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"
+                    }`}>
+                      {history.length - idx}
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-foreground">
+                        {new Date(entry.completedAt).toLocaleDateString("es-CO", { year: "numeric", month: "long", day: "numeric" })}
+                      </p>
+                      {idx === 0 && <p className="text-xs text-primary">Más reciente</p>}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-xl font-bold tabular-nums ${
+                      entry.overallScore >= 70 ? "text-emerald-600" : entry.overallScore >= 50 ? "text-amber-500" : "text-red-500"
+                    }`}>
+                      {Math.round(entry.overallScore)}
+                    </p>
+                    <p className="text-xs text-muted-foreground">Score global</p>
+                  </div>
+                </div>
+                {scores.length > 0 && (
+                  <div className="grid grid-cols-3 gap-1.5 mt-2">
+                    {scores.map((s) => (
+                      <div key={s.domain} className="flex items-center justify-between px-2 py-1 rounded bg-background/50 border border-border">
+                        <span className="text-xs text-muted-foreground truncate max-w-[80px]">{s.domain.split(" ")[0]}</span>
+                        <span className="text-xs font-bold tabular-nums text-foreground ml-1">{Math.round(s.score)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {entry.summary && (
+                  <p className="text-xs text-muted-foreground mt-2 line-clamp-2">{entry.summary}</p>
+                )}
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
+    </motion.div>
+  );
+}
+
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   completed: { label: "Completado", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   in_progress: { label: "En progreso", color: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -451,6 +521,9 @@ export default function CollaboratorDetail({ userId }: Props) {
               </Card>
             </motion.div>
           )}
+
+          {/* ── Historial de Evaluaciones (Sprint D) ── */}
+          <AssessmentHistorySection userId={userId} />
 
           {/* ── Fechas clave al pie ── */}
           <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground pb-4">

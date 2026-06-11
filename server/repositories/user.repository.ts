@@ -61,3 +61,9 @@ export async function promoteToAdmin(userId: number): Promise<void> {
 
   await db.update(users).set({ role: "admin" }).where(eq(users.id, userId));
 }
+
+export async function updateUserRole(userId: number, role: "user" | "admin"): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database unavailable");
+  await db.update(users).set({ role }).where(eq(users.id, userId));
+}

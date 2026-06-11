@@ -125,3 +125,41 @@ export async function getEvidenceByDomain(
       )
     );
 }
+
+// ─── Role Profile Management (Sprint D) ──────────────────────────────────────
+
+/** Get all role expectations (all roles, all domains) */
+export async function getAllRoleExpectations(): Promise<RoleSkillExpectation[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(roleSkillExpectations);
+}
+
+/** Replace all expectations for a role (upsert by roleName + domainId) */
+export async function upsertRoleExpectations(
+  roleName: string,
+  expectations: Array<{ domainId: number; expectedScore: number; weight: number }>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  // Delete existing expectations for this role
+  await db.delete(roleSkillExpectations).where(eq(roleSkillExpectations.roleName, roleName));
+  // Insert new ones
+  if (expectations.length > 0) {
+    await db.insert(roleSkillExpectations).values(
+      expectations.map((e) => ({
+        roleName,
+        domainId: e.domainId,
+        expectedScore: e.expectedScore,
+        weight: e.weight,
+      }))
+    );
+  }
+}
+
+/** Delete all expectations for a role */
+export async function deleteRoleExpectations(roleName: string): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(roleSkillExpectations).where(eq(roleSkillExpectations.roleName, roleName));
+}
