@@ -12,6 +12,7 @@ import { AnimatedProgressBar } from "@/components/ui/animated-progress";
 import { PageTransition, StaggerContainer, StaggerItem } from "@/components/ui/page-transition";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import {
   ArrowLeft,
   User,
@@ -29,6 +30,7 @@ import {
   Sparkles,
   Clock,
   AlertTriangle,
+  Download,
 } from "lucide-react";
 
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
@@ -41,7 +43,27 @@ type Props = { userId: number };
 
 export default function CollaboratorDetail({ userId }: Props) {
   const [, navigate] = useLocation();
+  const [isPdfLoading, setIsPdfLoading] = useState(false);
   const { data, isLoading, error } = trpc.admin.getCollaboratorDetail.useQuery({ userId });
+
+  async function handleExportPdf() {
+    setIsPdfLoading(true);
+    try {
+      const res = await fetch(`/api/export/collaborator-pdf/${userId}`);
+      if (!res.ok) throw new Error("Error generando PDF");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `reporte-${(data?.user?.name ?? "colaborador").toLowerCase().replace(/[^a-z0-9]/g, "-")}.pdf`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsPdfLoading(false);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -85,6 +107,20 @@ export default function CollaboratorDetail({ userId }: Props) {
           >
             <Button variant="outline" size="sm" className="btn-press" onClick={() => navigate("/dashboard/admin")}>
               <ArrowLeft size={14} className="mr-1.5" /> Volver
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="btn-press ml-auto"
+              onClick={handleExportPdf}
+              disabled={isPdfLoading}
+            >
+              {isPdfLoading ? (
+                <Loader2 size={14} className="mr-1.5 animate-spin" />
+              ) : (
+                <Download size={14} className="mr-1.5" />
+              )}
+              {isPdfLoading ? "Generando..." : "Exportar PDF"}
             </Button>
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-full brand-gradient flex items-center justify-center shadow-md shadow-primary/20">

@@ -161,3 +161,30 @@
 - [x] Verificar TypeScript (0 errores)
 - [x] Ejecutar 121 tests (todos pasando)
 - [x] Checkpoint y push a GitHub
+
+## Sprint A — Funcionalidad de Negocio
+
+### A1: Notificaciones en tiempo real
+- [x] Tabla `notifications` en schema.ts (id, userId, type, title, message, read, createdAt)
+- [x] Migración SQL y aplicar con webdev_execute_sql
+- [x] Repositorio notifications.repository.ts (create, getUnread, markRead, markAllRead)
+- [x] Procedimientos tRPC: notifications.getUnread, notifications.markRead, notifications.markAllRead
+- [x] Trigger automático: al completar onboarding → notificar al admin
+- [x] Trigger automático: al completar assessment → notificar al admin
+- [x] Badge de notificaciones en IttiLayout (sidebar header) con contador animado
+- [x] Panel de notificaciones (dropdown) con lista de eventos recientes
+
+### A2: Exportación PDF por colaborador
+- [x] Ruta Express GET /api/export/collaborator-pdf/:userId
+- [x] Servicio pdf.service.ts con generación de reporte HTML → PDF usando html-pdf-node + Chromium
+- [x] Reporte incluye: datos del colaborador, radar de competencias, brechas, plan de aprendizaje
+- [x] Botón "Exportar PDF" en CollaboratorDetail (admin)
+- [x] Estado de carga mientras genera el PDF
+
+### A3: Vista comparativa de equipo por departamento
+- [x] Procedimiento tRPC admin.getTeamComparison(department)
+- [x] Página TeamComparison.tsx con tabla comparativa y gráfico de barras agrupadas
+- [x] Filtro por departamento (Select) en TeamComparison
+- [x] Ruta /dashboard/admin/team en App.tsx
+- [x] Nav item "Comparativa Equipo" en IttiLayout para admins
+- [x] 121 tests pasando (0 errores TypeScript)

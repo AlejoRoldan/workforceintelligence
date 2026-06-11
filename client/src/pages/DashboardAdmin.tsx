@@ -138,16 +138,27 @@ export default function DashboardAdmin() {
                 Vista organizacional del talento · Administrador P&C
               </p>
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="btn-press flex items-center gap-1.5"
-              onClick={handleExportCSV}
-              disabled={csvLoading}
-            >
-              {csvLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
-              Exportar CSV
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                className="btn-press flex items-center gap-1.5"
+                onClick={() => navigate("/dashboard/admin/team")}
+              >
+                <Users size={14} />
+                Comparativa
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="btn-press flex items-center gap-1.5"
+                onClick={handleExportCSV}
+                disabled={csvLoading}
+              >
+                {csvLoading ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+                Exportar CSV
+              </Button>
+            </div>
           </div>
 
           {/* ── Bento Grid: KPI Cards ── */}

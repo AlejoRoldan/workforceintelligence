@@ -17,7 +17,9 @@ import {
   LogOut,
   ChevronRight,
   Sparkles,
+  Users,
 } from "lucide-react";
+import NotificationBell from "./NotificationBell";
 
 interface NavItem {
   href: string;
@@ -32,6 +34,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/proof-of-skills", label: "Proof of Skills", icon: Target, roles: ["user"] },
   { href: "/learning-path", label: "Ruta de Aprendizaje", icon: Sparkles, roles: ["user"] },
   { href: "/dashboard/admin", label: "Dashboard P&C", icon: BarChart3, roles: ["admin"] },
+  { href: "/dashboard/admin/team", label: "Comparativa Equipo", icon: Users, roles: ["admin"] },
 ];
 
 // Variantes de animación para los nav items en stagger
@@ -227,6 +230,7 @@ export default function IttiLayout({ children }: { children: React.ReactNode }) 
             )}
           </div>
           <div className="flex items-center gap-2">
+            {role === "admin" && <NotificationBell />}
             <span className="text-xs text-muted-foreground hidden sm:block">
               People & Culture · IttiTalent
             </span>

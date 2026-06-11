@@ -128,6 +128,27 @@ export const learningPlans = mysqlTable("learning_plans", {
 export type LearningPlanRow = typeof learningPlans.$inferSelect;
 export type InsertLearningPlan = typeof learningPlans.$inferInsert;
 
+// ─── Notifications ───────────────────────────────────────────────────────────
+// In-app notifications for admin users (P&C team events).
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),          // recipient (admin)
+  type: mysqlEnum("type", [
+    "onboarding_completed",
+    "assessment_completed",
+    "learning_plan_ready",
+    "profile_updated",
+  ]).notNull(),
+  title: varchar("title", { length: 256 }).notNull(),
+  message: text("message").notNull(),
+  relatedUserId: int("relatedUserId"),       // collaborator who triggered the event
+  read: boolean("read").default(false).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
+
 // ─── Shared Types ─────────────────────────────────────────────────────────────
 export type MacroDomain =
   | "Digital & GenAI"

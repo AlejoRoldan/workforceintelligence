@@ -44,6 +44,12 @@ import {
   saveEvidence,
 } from "./repositories/competency.repository";
 import { auditLog, createAuditEntry } from "./services/audit.service";
+import {
+  getUnreadNotifications,
+  getAllNotifications,
+  markNotificationRead,
+  markAllNotificationsRead,
+} from "./repositories/notifications.repository";
 
 // ─── Permissions ──────────────────────────────────────────────────────────────
 import { adminProcedure } from "./middleware/permissions";
@@ -121,6 +127,9 @@ export const appRouter = router({
           const profileScores = await extractProfileFromConversation(finalHistory);
           await saveOnboardingProfile(session.id, profileScores);
           auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "onboarding.completed", "onboarding_session", session.id));
+          // Sprint A: Notify admins
+          const { notifyOnboardingCompleted } = await import("./services/notifications.service");
+          notifyOnboardingCompleted(ctx.user.id, ctx.user.name ?? "Colaborador").catch(() => {});
         } else if (history.length === 0) {
           auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "onboarding.started", "onboarding_session", session.id));
         }
@@ -226,6 +235,9 @@ export const appRouter = router({
         }
 
         auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "assessment.submitted", "assessment", assessment.id, { overallScore }));
+        // Sprint A: Notify admins
+        const { notifyAssessmentCompleted } = await import("./services/notifications.service");
+        notifyAssessmentCompleted(ctx.user.id, ctx.user.name ?? "Colaborador", overallScore).catch(() => {});
 
         return { radarScores, overallScore, summary, answers };
       }),
@@ -548,7 +560,70 @@ export const appRouter = router({
       )).sort();
       return departments;
     }),
+
+    getTeamComparison: adminProcedure
+      .input(z.object({ department: z.string().optional() }))
+      .query(async ({ ctx, input }) => {
+        const allUsers = await getAllUsers();
+        const collaborators = allUsers.filter((u) =>
+          u.role === "user" &&
+          (input.department ? u.department === input.department : true)
+        );
+
+        const assessments = await getAllAssessments();
+        const assessmentMap = new Map(assessments.map((a) => [a.userId, a]));
+
+        const { getAllOnboardingSessions } = await import("./repositories/onboarding.repository");
+        const onboardings = await getAllOnboardingSessions();
+        const onboardingMap = new Map(onboardings.map((o) => [o.userId, o]));
+
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.team_comparison_viewed", `department:${input.department ?? "all"}`));
+
+        return collaborators.map((u) => {
+          const assessment = assessmentMap.get(u.id);
+          const onboarding = onboardingMap.get(u.id);
+          return {
+            id: u.id,
+            name: u.name ?? "Sin nombre",
+            jobTitle: u.jobTitle ?? "Sin cargo",
+            department: u.department ?? "Sin área",
+            onboardingStatus: onboarding?.status ?? "pending",
+            assessmentStatus: assessment?.status ?? "pending",
+            overallScore: assessment?.overallScore ?? null,
+            radarScores: (assessment?.radarScores ?? []) as Array<{ domain: string; score: number; expected: number }>,
+          };
+        });
+      }),
+    }),
+
+  // ─── Notifications ────────────────────────────────────────────────────────────────────────────
+  notifications: router({
+    /** Get unread count + list for the current admin user */
+    getUnread: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") return { count: 0, items: [] };
+      const items = await getUnreadNotifications(ctx.user.id);
+      return { count: items.length, items };
+    }),
+
+    /** Get all notifications (read + unread) for the current admin user */
+    getAll: protectedProcedure.query(async ({ ctx }) => {
+      if (ctx.user.role !== "admin") return [];
+      return getAllNotifications(ctx.user.id);
+    }),
+
+    /** Mark a single notification as read */
+    markRead: protectedProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        await markNotificationRead(input.id, ctx.user.id);
+        return { success: true };
+      }),
+
+    /** Mark all notifications as read */
+    markAllRead: protectedProcedure.mutation(async ({ ctx }) => {
+      await markAllNotificationsRead(ctx.user.id);
+      return { success: true };
+    }),
   }),
 });
-
 export type AppRouter = typeof appRouter;

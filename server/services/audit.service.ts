@@ -15,6 +15,7 @@ export type AuditAction =
   | "admin.collaborators_viewed"
   | "admin.collaborator_detail_viewed"
   | "admin.csv_exported"
+  | "admin.team_comparison_viewed"
   | "auth.login"
   | "auth.logout";
 

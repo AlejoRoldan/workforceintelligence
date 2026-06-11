@@ -6,6 +6,7 @@ import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
 import { assessStreamRouter } from "../routes/assess-stream";
 import { exportCsvRouter } from "../routes/export-csv";
+import { exportCollaboratorPdf } from "../routes/export-pdf";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -40,6 +41,7 @@ async function startServer() {
   registerOAuthRoutes(app);
   app.use(assessStreamRouter);
   app.use(exportCsvRouter);
+  app.get("/api/export/collaborator-pdf/:userId", exportCollaboratorPdf);
   // tRPC API
   app.use(
     "/api/trpc",
