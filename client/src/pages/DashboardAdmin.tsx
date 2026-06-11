@@ -2,7 +2,7 @@
  * DashboardAdmin — Panel P&C para Administradores.
  * Sprint 4: filtros por área/estado, búsqueda, exportación CSV, enlace a detalle.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,9 @@ import {
   Download,
   ExternalLink,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,6 +42,8 @@ type Collaborator = {
   completedAt: Date | null;
 };
 
+const PAGE_SIZE = 10;
+
 const STATUS_BADGE: Record<string, { label: string; color: string }> = {
   completed: { label: "Completado", color: "bg-emerald-50 text-emerald-700 border-emerald-200" },
   in_progress: { label: "En progreso", color: "bg-amber-50 text-amber-700 border-amber-200" },
@@ -54,6 +59,7 @@ export default function DashboardAdmin() {
   const [assessFilter, setAssessFilter] = useState("all");
   const [onbFilter, setOnbFilter] = useState("all");
   const [csvLoading, setCsvLoading] = useState(false);
+  const [page, setPage] = useState(1);
 
   const { data: stats, isLoading: statsLoading } = trpc.admin.getStats.useQuery();
   const { data: allCollaborators = [], isLoading: collabLoading } = trpc.admin.getCollaborators.useQuery();
@@ -79,6 +85,12 @@ export default function DashboardAdmin() {
     if (onbFilter !== "all") list = list.filter((c) => c.onboardingStatus === onbFilter);
     return list;
   }, [allCollaborators, search, deptFilter, assessFilter, onbFilter]);
+
+  const totalPages = Math.max(1, Math.ceil(collaborators.length / PAGE_SIZE));
+  const pagedCollaborators = collaborators.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset to page 1 when filters change
+  useEffect(() => { setPage(1); }, [search, deptFilter, assessFilter, onbFilter]);
 
   const domainAverages = stats?.domainAverages ?? [];
   const radarData: RadarScore[] = domainAverages.map((d) => ({
@@ -244,6 +256,11 @@ export default function DashboardAdmin() {
                 <Badge variant="outline" className="text-xs ml-1">
                   {collaborators.length} / {(allCollaborators as Collaborator[]).length}
                 </Badge>
+                {totalPages > 1 && (
+                  <span className="text-xs text-muted-foreground">
+                    Pág. {page}/{totalPages}
+                  </span>
+                )}
               </CardTitle>
             </div>
 
@@ -302,7 +319,7 @@ export default function DashboardAdmin() {
                   variant="ghost"
                   size="sm"
                   className="h-8 text-xs text-muted-foreground"
-                  onClick={() => { setSearch(""); setDeptFilter("all"); setAssessFilter("all"); setOnbFilter("all"); }}
+                  onClick={() => { setSearch(""); setDeptFilter("all"); setAssessFilter("all"); setOnbFilter("all"); setPage(1); }}
                 >
                   Limpiar filtros
                 </Button>
@@ -331,11 +348,12 @@ export default function DashboardAdmin() {
                       <th className="text-center py-2.5 pr-4 text-xs font-medium text-muted-foreground">Onboarding</th>
                       <th className="text-center py-2.5 pr-4 text-xs font-medium text-muted-foreground">Evaluación</th>
                       <th className="text-center py-2.5 pr-4 text-xs font-medium text-muted-foreground">Puntaje</th>
+                      <th className="text-left py-2.5 pr-4 text-xs font-medium text-muted-foreground hidden lg:table-cell">Fecha Eval.</th>
                       <th className="text-center py-2.5 text-xs font-medium text-muted-foreground">Detalle</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {collaborators.map((c: Collaborator) => {
+                    {pagedCollaborators.map((c: Collaborator) => {
                       const onbCfg = STATUS_BADGE[c.onboardingStatus] ?? STATUS_BADGE.pending!;
                       const asmCfg = STATUS_BADGE[c.assessmentStatus] ?? STATUS_BADGE.pending!;
                       return (
@@ -374,6 +392,15 @@ export default function DashboardAdmin() {
                               <span className="text-muted-foreground text-xs">—</span>
                             )}
                           </td>
+                          <td className="py-3 pr-4 hidden lg:table-cell">
+                            {c.completedAt ? (
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(c.completedAt).toLocaleDateString("es-PY")}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">—</span>
+                            )}
+                          </td>
                           <td className="py-3 text-center">
                             <Button
                               variant="ghost"
@@ -389,6 +416,58 @@ export default function DashboardAdmin() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* Pagination controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between mt-4 pt-4 border-t border-border">
+                <p className="text-xs text-muted-foreground">
+                  Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, collaborators.length)} de {collaborators.length}
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0 btn-press"
+                    disabled={page === 1}
+                    onClick={() => setPage(p => p - 1)}
+                  >
+                    <ChevronLeft size={13} />
+                  </Button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - page) <= 1)
+                    .reduce<(number | "...")[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && (p as number) - (arr[idx - 1] as number) > 1) acc.push("...");
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, idx) =>
+                      p === "..." ? (
+                        <span key={`ellipsis-${idx}`} className="text-xs text-muted-foreground px-1">…</span>
+                      ) : (
+                        <Button
+                          key={p}
+                          variant={page === p ? "default" : "outline"}
+                          size="sm"
+                          className="h-7 w-7 p-0 btn-press text-xs"
+                          onClick={() => setPage(p as number)}
+                        >
+                          {p}
+                        </Button>
+                      )
+                    )
+                  }
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="h-7 w-7 p-0 btn-press"
+                    disabled={page === totalPages}
+                    onClick={() => setPage(p => p + 1)}
+                  >
+                    <ChevronRight size={13} />
+                  </Button>
+                </div>
               </div>
             )}
           </CardContent>

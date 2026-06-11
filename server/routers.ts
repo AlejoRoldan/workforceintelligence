@@ -479,6 +479,8 @@ export const appRouter = router({
             profile: onboarding.competencyProfile,
             messageCount: (onboarding.messages as unknown[])?.length ?? 0,
             completedAt: onboarding.completedAt,
+            startedAt: onboarding.createdAt,
+            lastUpdatedAt: onboarding.updatedAt,
           } : null,
           assessment: assessment ? {
             status: assessment.status,
@@ -486,9 +488,54 @@ export const appRouter = router({
             radarScores: assessment.radarScores as RadarScore[],
             summary: assessment.summary,
             completedAt: assessment.completedAt,
+            startedAt: assessment.createdAt,
+            lastUpdatedAt: assessment.updatedAt,
             questionCount: assessment.questions.length,
+            answeredCount: assessment.answers.length,
           } : null,
           evidence,
+          // Timeline: ordered list of key events for the collaborator
+          timeline: [
+            onboarding ? {
+              type: "onboarding_started" as const,
+              label: "Onboarding iniciado",
+              date: onboarding.createdAt,
+              status: onboarding.status,
+            } : null,
+            onboarding?.completedAt ? {
+              type: "onboarding_completed" as const,
+              label: "Onboarding completado",
+              date: onboarding.completedAt,
+              status: "completed" as const,
+            } : null,
+            assessment ? {
+              type: "assessment_started" as const,
+              label: "Evaluación iniciada",
+              date: assessment.createdAt,
+              status: assessment.status,
+            } : null,
+            assessment?.completedAt ? {
+              type: "assessment_completed" as const,
+              label: `Evaluación completada — Puntaje: ${Math.round(assessment.overallScore ?? 0)}/100`,
+              date: assessment.completedAt,
+              status: "completed" as const,
+            } : null,
+          ].filter(Boolean),
+        };
+      }),
+
+    getCollaboratorPlan: adminProcedure
+      .input(z.object({ userId: z.number() }))
+      .query(async ({ ctx, input }) => {
+        const { getLearningPlanByUserId } = await import("./repositories/learning.repository");
+        const plan = await getLearningPlanByUserId(input.userId);
+        if (!plan) return null;
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "admin.collaborator_detail_viewed", `learning_plan:${input.userId}`));
+        return {
+          id: plan.id,
+          status: plan.status,
+          generatedAt: plan.generatedAt,
+          plan: plan.planJson,
         };
       }),
 

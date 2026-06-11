@@ -111,11 +111,11 @@
 - [x] Tests del Sprint 4 (23 tests: CSV escaping, headers, filtros, scoring, audit)
 - [x] 0 errores TypeScript — 71 tests pasando en 5 archivos
 
-## Deuda Técnica Sprint 4 (Sprints futuros)
-- [ ] Paginación real en tabla de colaboradores del Dashboard Admin
-- [ ] Columna "Fecha evaluación" en tabla de colaboradores
-- [ ] Historial completo de sesiones/evaluaciones por colaborador en vista detalle
-- [ ] Tests de integración para GET /api/admin/export.csv
+## Deuda Técnica Sprint 4 (Cerrada en Sprint Deuda)
+- [x] Paginación real en tabla de colaboradores del Dashboard Admin
+- [x] Columna "Fecha evaluación" en tabla de colaboradores
+- [x] Historial completo de sesiones/evaluaciones por colaborador en vista detalle
+- [x] Tests de integración para GET /api/admin/export.csv
 
 ## Sprint 5 — Rutas de Aprendizaje (Learning Paths)
 - [x] Tabla learning_plans en schema Drizzle con campos: userId, assessmentId, planJson, status, generatedAt
@@ -132,7 +132,16 @@
 - [x] Tests del Sprint 5 — 21 tests: classifyGapPriority, hasSignificantGaps, structure, sorting, progress, preconditions, hours
 - [x] 0 errores TypeScript — 92 tests pasando en 6 archivos
 
-## Deuda Técnica Sprint 5 (Sprints futuros)
+## Deuda Técnica Sprint 5 (Cerrada en Sprint Deuda)
 - [x] Corregir getLearningPlanByUserId para devolver el plan más reciente (desc createdAt)
-- [ ] Implementar vista del learning plan en CollaboratorDetail.tsx para administradores P&C
-- [ ] Tests de integración para learning.getMyPlan y vista admin del plan
+- [x] Implementar vista del learning plan en CollaboratorDetail.tsx para administradores P&C
+- [x] Tests de integración para learning.getMyPlan y vista admin del plan
+
+## Cierre de Deuda Técnica (Sprints 4 y 5)
+- [x] Paginación real en tabla de colaboradores del Dashboard Admin (PAGE_SIZE=10, controles prev/next/números)
+- [x] Columna "Fecha evaluación" en tabla de colaboradores (responsive, oculta en mobile)
+- [x] Historial completo de sesiones/evaluaciones por colaborador en vista detalle
+- [x] Tests de integración para exportación CSV (escapeCsvField, buildCsvRow, 8 tests)
+- [x] Implementar vista del learning plan en CollaboratorDetail.tsx para administradores P&C
+- [x] Tests de integración para learning.getMyPlan y admin.getCollaboratorPlan (29 tests en debt-closure.test.ts)
+- [x] 121 tests pasando en 7 archivos, 0 errores TypeScript
