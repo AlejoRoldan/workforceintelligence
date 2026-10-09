@@ -25,7 +25,7 @@
 
 IttiTalent es una plataforma web interna diseñada para el equipo de **People & Culture (P&C)** de Itti Paraguay. Su propósito es transformar el proceso de incorporación y desarrollo de talento mediante tres capacidades centrales: un **onboarding conversacional** guiado por un agente de IA que construye el perfil de competencias del colaborador a través del diálogo, una **prueba de habilidades dinámica** (Proof of Skills) donde la IA genera preguntas adaptadas al rol y evalúa las respuestas en tiempo real con streaming, y un **plan de desarrollo personalizado** que identifica brechas por dominio y propone acciones concretas, recursos y estimaciones de tiempo.
 
-La plataforma opera con dos roles diferenciados. El **Colaborador** accede a su propio proceso de onboarding, realiza su evaluación y consulta su ruta de aprendizaje. El **Administrador P&C** tiene visibilidad organizacional completa: métricas agregadas, filtros por área y departamento, vista de detalle por colaborador y exportación de resultados a CSV compatible con Excel.
+La plataforma opera con dos roles diferenciados. El **Colaborador** accede a su propio proceso de onboarding, realiza su evaluación y consulta su ruta de aprendizaje. El **Administrador P&C** tiene visibilidad organizacional completa: métricas agregadas, filtros por área y departamento, vista de detalle por colaborador, exportación de resultados a CSV y PDF, comparativa de equipos, gestión de usuarios e invitaciones, configuración de perfiles de cargo e historial de evaluaciones.
 
 ---
 
@@ -169,6 +169,9 @@ itti-talent/
 │       │   ├── LearningPath.tsx     # Plan de desarrollo personalizado
 │       │   ├── DashboardCollaborator.tsx  # Dashboard del colaborador
 │       │   ├── DashboardAdmin.tsx   # Dashboard P&C con filtros y CSV
+│       │   ├── TeamComparison.tsx   # Comparativa de competencias por equipo
+│       │   ├── UserManagement.tsx   # Usuarios, roles e invitaciones
+│       │   ├── RoleProfiles.tsx     # Niveles esperados por perfil de cargo
 │       │   └── CollaboratorDetail.tsx     # Detalle por colaborador (admin)
 │       ├── App.tsx                  # Rutas, guards y layout wrapper
 │       └── index.css                # Tokens de diseño y tema global
@@ -187,15 +190,20 @@ itti-talent/
 │   │   ├── assessment.repository.ts
 │   │   ├── competency.repository.ts
 │   │   ├── learning.repository.ts
+│   │   ├── invitations.repository.ts
+│   │   ├── assessment-history.repository.ts
 │   │   └── user.repository.ts
 │   ├── routes/                      # Endpoints Express (fuera de tRPC)
 │   │   ├── assess-stream.ts         # POST /api/assess/stream (SSE)
-│   │   └── export-csv.ts            # GET /api/admin/export.csv
+│   │   ├── export-csv.ts            # GET /api/admin/export.csv
+│   │   └── export-pdf.ts            # Reporte PDF individual para administración
 │   ├── services/                    # Lógica de negocio y llamadas a IA
 │   │   ├── llm.service.ts           # Prompts centralizados para todos los flujos
 │   │   ├── scoring.service.ts       # Motor de scoring sin aleatoriedad
 │   │   ├── streaming.service.ts     # Evaluación incremental con SSE
 │   │   ├── learning.service.ts      # Generación de rutas de aprendizaje
+│   │   ├── notifications.service.ts # Alertas internas para administradores
+│   │   ├── pdf.service.ts           # Generación de reportes PDF
 │   │   └── audit.service.ts         # Registro estructurado de acciones
 │   ├── routers.ts                   # Procedimientos tRPC (orquestación)
 │   ├── db.ts                        # Helpers de base de datos (Drizzle)
@@ -203,6 +211,7 @@ itti-talent/
 │
 ├── shared/
 │   ├── competency.ts                # Fuente única: dominios, capas, tipos
+│   ├── auth-query-policy.ts          # Reintento acotado de auth.me
 │   ├── const.ts                     # Constantes compartidas (cookie name, etc.)
 │   └── types.ts                     # Tipos compartidos cliente-servidor
 │
@@ -228,6 +237,9 @@ El schema completo se define en `drizzle/schema.ts` y se gestiona con migracione
 | `role_skill_expectations` | Puntaje esperado por dominio para cada rol de trabajo | `domainId → competency_domains` |
 | `competency_evidence` | Evidencia AI por respuesta: frases clave, confianza, rationale, score | `assessmentId → competency_assessments` |
 | `learning_plans` | Plan de desarrollo personalizado en JSON estructurado con estado de progreso | `userId → users`, `assessmentId → competency_assessments` |
+| `notifications` | Notificaciones internas para Administradores P&C | `userId → users` |
+| `user_invitations` | Invitaciones emitidas a futuros colaboradores y su estado | `invitedBy → users` |
+| `assessment_history` | Snapshot inmutable del resultado de cada evaluación completada | `userId → users`, `assessmentId → competency_assessments` |
 
 ### Estructura del JSON del plan de aprendizaje (`learning_plans.planJson`)
 
@@ -290,6 +302,10 @@ El schema completo se define en `drizzle/schema.ts` y se gestiona con migracione
 | `admin` | `getCollaborators` | Query | Admin | Lista con filtros por área/estado |
 | `admin` | `getDepartments` | Query | Admin | Departamentos únicos para filtros |
 | `admin` | `getCollaboratorDetail` | Query | Admin | Detalle completo de un colaborador |
+| `notifications` | `list`, `markRead`, `markAllRead` | Query / Mutations | Admin | Bandeja de notificaciones administrativas |
+| `userManagement` | `getUsers`, `invite`, `updateRole` | Query / Mutations | Admin | Gestión de colaboradores, roles e invitaciones |
+| `roleProfiles` | `getAll`, `getDomains`, `upsertRole`, `deleteRole` | Query / Mutations | Admin | Expectativas por dominio y perfil de cargo |
+| `assessmentHistory` | `getByUser` | Query | Admin | Evolución de evaluaciones por colaborador |
 
 ### Endpoints Express (fuera de tRPC)
 
@@ -297,6 +313,7 @@ El schema completo se define en `drizzle/schema.ts` y se gestiona con migracione
 |---|---|---|---|
 | `POST` | `/api/assess/stream` | JWT cookie | Evaluación incremental con SSE. Emite eventos `token`, `eval_complete`, `done`, `error` |
 | `GET` | `/api/admin/export.csv` | JWT cookie + rol admin | Exporta todos los resultados a CSV con BOM Unicode para Excel |
+| `GET` | `/api/export/collaborator-pdf/:userId` | JWT cookie + rol admin | Genera un reporte individual en PDF |
 
 ---
 
@@ -325,10 +342,14 @@ Login (Manus OAuth)
   └─→ Redirección automática a /dashboard/admin
         ├─→ Métricas organizacionales (radar promedio, brechas por dominio)
         ├─→ Tabla de colaboradores con filtros (área, estado, búsqueda)
-        ├─→ Exportar CSV → descarga inmediata compatible con Excel
+        ├─→ Comparativa de equipos y exportación CSV
+        ├─→ Gestión de usuarios, roles e invitaciones
+        ├─→ Perfiles de cargo con expectativas editables por dominio
         └─→ Detalle por colaborador (/dashboard/admin/collaborator/:id)
               ├─→ Radar personal + brechas
               ├─→ Perfil de onboarding
+              ├─→ Historial de snapshots de evaluación
+              ├─→ Reporte PDF descargable
               └─→ Resumen AI de la evaluación
 ```
 
@@ -364,6 +385,10 @@ El control de acceso se implementa como un middleware tRPC en `server/middleware
 
 El `rate-limit.ts` implementa un rate limiter en memoria (sin Redis) con ventanas deslizantes: 120 req/min para la API general y 20 req/min para endpoints LLM. Esta decisión es apropiada para el volumen actual de uso interno. Si la plataforma escala a múltiples instancias, se deberá migrar a un store compartido (Redis).
 
+### Resiliencia de la consulta de sesión
+
+La página pública consulta `auth.me` para determinar si debe mostrar acceso al dashboard o los controles de inicio de sesión. Esa llamada ahora utiliza una política explícita de **un único reintento** con espera exponencial breve (400 ms, acotada a 1.5 s). La decisión evita que un corte momentáneo de red o una reconexión del servidor de desarrollo se presente como un fallo definitivo, sin ocultar errores persistentes ni generar reintentos indefinidos.
+
 ---
 
 ## 10. Seguridad y Calidad
@@ -378,7 +403,7 @@ El `audit.service.ts` registra en formato JSON estructurado todas las acciones c
 
 ### Testing
 
-El proyecto mantiene **92 tests** distribuidos en 6 archivos, organizados por sprint. Los tests cubren el motor de scoring, el servicio de audit, las reglas de RBAC, el rate limiting, el Competency Engine, el streaming SSE, los filtros del dashboard admin, la exportación CSV y las rutas de aprendizaje.
+El proyecto mantiene **124 tests** distribuidos en 8 archivos, organizados por sprint y por comportamiento transversal. Los tests cubren el motor de scoring, el servicio de audit, las reglas de RBAC, el rate limiting, el Competency Engine, el streaming SSE, los filtros del dashboard admin, la exportación CSV, las rutas de aprendizaje y la política de reintento de autenticación.
 
 ```bash
 pnpm test          # Ejecutar todos los tests
@@ -397,6 +422,10 @@ pnpm test --watch  # Modo watch durante desarrollo
 | **Sprint 3** | Streaming SSE | Evaluación incremental en tiempo real, endpoint SSE, hook `useAssessmentStream`, 48 tests |
 | **Sprint 4** | Dashboard P&C | Filtros por área/estado, detalle por colaborador, exportación CSV, 71 tests |
 | **Sprint 5** | Rutas de Aprendizaje | Tabla `learning_plans`, servicio AI, página `LearningPath.tsx`, integración post-evaluación, 92 tests |
+| **UX/UI** | Experiencia de producto | Componentes reutilizables, layout animado, métricas y progreso con motion accesible |
+| **Sprint A** | Analítica y comunicación | Notificaciones, reporte PDF individual y comparativa de equipos |
+| **Sprint D** | Administración del talento | Usuarios e invitaciones, perfiles de cargo e historial de evaluaciones |
+| **Estabilidad tRPC** | Resiliencia de sesión | Reintento acotado de `auth.me`, 124 tests y TypeScript validado |
 
 ---
 
