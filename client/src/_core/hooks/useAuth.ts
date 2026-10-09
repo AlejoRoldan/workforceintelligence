@@ -1,5 +1,9 @@
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
+import {
+  AUTH_QUERY_RETRY_COUNT,
+  getAuthQueryRetryDelay,
+} from "@shared/auth-query-policy";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
 
@@ -14,7 +18,10 @@ export function useAuth(options?: UseAuthOptions) {
   const utils = trpc.useUtils();
 
   const meQuery = trpc.auth.me.useQuery(undefined, {
-    retry: false,
+    // auth.me is public and is the first request made by the landing page.
+    // Give a transient network interruption one short retry before surfacing it.
+    retry: AUTH_QUERY_RETRY_COUNT,
+    retryDelay: getAuthQueryRetryDelay,
     refetchOnWindowFocus: false,
   });
 
