@@ -39,8 +39,16 @@ class OAuthService {
   }
 
   private decodeState(state: string): string {
-    const redirectUri = atob(state);
-    return redirectUri;
+    const decoded = atob(state);
+    try {
+      const parsed = JSON.parse(decoded) as { redirectUri?: unknown };
+      if (typeof parsed.redirectUri === "string" && parsed.redirectUri.length > 0) {
+        return parsed.redirectUri;
+      }
+    } catch {
+      // Backwards compatibility for sessions that still use base64(redirectUri).
+    }
+    return decoded;
   }
 
   async getTokenByCode(

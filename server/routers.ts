@@ -26,7 +26,7 @@ import {
   getAssessmentByUserId,
   getAllAssessments,
 } from "./repositories/assessment.repository";
-import { getAllUsers, updateUserProfile } from "./repositories/user.repository";
+import { getAllUsers, updateUserProfile, updateUserRole } from "./repositories/user.repository";
 
 // ─── Services ─────────────────────────────────────────────────────────────────
 import {
@@ -54,6 +54,8 @@ import {
   createInvitation,
   getAllInvitations,
   getPendingInvitations,
+  findRedeemableInvitation,
+  redeemInvitation,
 } from "./repositories/invitations.repository";
 import {
   createAssessmentSnapshot,
@@ -65,6 +67,11 @@ import { adminProcedure } from "./middleware/permissions";
 
 // ─── Shared types ─────────────────────────────────────────────────────────────
 import { MACRO_DOMAINS, DEFAULT_EXPECTED_SCORES, type RadarScore } from "../shared/competency";
+import {
+  isInvitationEmailAllowed,
+  isInvitationExpired,
+  normalizeInvitationEmail,
+} from "../shared/invitation-policy";
 
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
@@ -81,6 +88,52 @@ export const appRouter = router({
       }
       return { success: true } as const;
     }),
+  }),
+
+  // ─── Invitations ────────────────────────────────────────────────────────────
+  invitation: router({
+    preview: publicProcedure
+      .input(z.object({ token: z.string().regex(/^[a-f0-9]{64}$/i) }))
+      .query(async ({ input }) => {
+        const invitation = await findRedeemableInvitation(input.token);
+        if (!invitation || isInvitationExpired(invitation.expiresAt)) {
+          return { valid: false as const };
+        }
+        return {
+          valid: true as const,
+          role: invitation.role,
+          emailRestricted: Boolean(normalizeInvitationEmail(invitation.email)),
+          expiresAt: invitation.expiresAt,
+          note: invitation.note,
+        };
+      }),
+    redeem: protectedProcedure
+      .input(z.object({ token: z.string().regex(/^[a-f0-9]{64}$/i) }))
+      .mutation(async ({ ctx, input }) => {
+        const invitation = await findRedeemableInvitation(input.token);
+        if (!invitation || isInvitationExpired(invitation.expiresAt)) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "La invitación no es válida o ya expiró." });
+        }
+        if (!isInvitationEmailAllowed(invitation.email, ctx.user.email)) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Esta invitación está destinada a otro correo electrónico." });
+        }
+
+        const redeemed = await redeemInvitation(input.token, ctx.user.id);
+        if (!redeemed) {
+          throw new TRPCError({ code: "CONFLICT", message: "La invitación ya fue utilizada." });
+        }
+
+        // An invite can promote a user, but never downgrades an existing admin.
+        const assignedRole = invitation.role === "admin" || ctx.user.role === "admin" ? "admin" : "user";
+        if (assignedRole !== ctx.user.role) {
+          await updateUserRole(ctx.user.id, assignedRole);
+        }
+        auditLog(createAuditEntry(ctx.user.id, ctx.user.name ?? "unknown", "user.profile_updated", "invitation", invitation.id, {
+          invitationRedeemed: true,
+          assignedRole,
+        }));
+        return { success: true as const, role: assignedRole };
+      }),
   }),
 
   // ─── User profile ───────────────────────────────────────────────────────────

@@ -1,4 +1,5 @@
 import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { normalizeReturnPath } from "@shared/invitation-policy";
 import type { Express, Request, Response } from "express";
 import * as db from "../db";
 import { getSessionCookieOptions } from "./cookies";
@@ -7,6 +8,16 @@ import { sdk } from "./sdk";
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
   return typeof value === "string" ? value : undefined;
+}
+
+function getReturnPath(state: string): string {
+  try {
+    const decoded = JSON.parse(Buffer.from(state, "base64").toString("utf8")) as { returnPath?: unknown };
+    return normalizeReturnPath(typeof decoded.returnPath === "string" ? decoded.returnPath : null);
+  } catch {
+    // Legacy state values only contained the OAuth redirect URI.
+    return "/";
+  }
 }
 
 export function registerOAuthRoutes(app: Express) {
@@ -44,7 +55,7 @@ export function registerOAuthRoutes(app: Express) {
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
-      res.redirect(302, "/");
+      res.redirect(302, getReturnPath(state));
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });

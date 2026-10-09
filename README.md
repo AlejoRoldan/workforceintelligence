@@ -172,6 +172,7 @@ itti-talent/
 │       │   ├── TeamComparison.tsx   # Comparativa de competencias por equipo
 │       │   ├── UserManagement.tsx   # Usuarios, roles e invitaciones
 │       │   ├── RoleProfiles.tsx     # Niveles esperados por perfil de cargo
+│       │   ├── JoinInvitation.tsx   # Preview y aceptación del enlace seguro
 │       │   └── CollaboratorDetail.tsx     # Detalle por colaborador (admin)
 │       ├── App.tsx                  # Rutas, guards y layout wrapper
 │       └── index.css                # Tokens de diseño y tema global
@@ -212,6 +213,7 @@ itti-talent/
 ├── shared/
 │   ├── competency.ts                # Fuente única: dominios, capas, tipos
 │   ├── auth-query-policy.ts          # Reintento acotado de auth.me
+│   ├── invitation-policy.ts          # Expiración, email y retorno OAuth seguro
 │   ├── const.ts                     # Constantes compartidas (cookie name, etc.)
 │   └── types.ts                     # Tipos compartidos cliente-servidor
 │
@@ -306,6 +308,7 @@ El schema completo se define en `drizzle/schema.ts` y se gestiona con migracione
 | `userManagement` | `getUsers`, `invite`, `updateRole` | Query / Mutations | Admin | Gestión de colaboradores, roles e invitaciones |
 | `roleProfiles` | `getAll`, `getDomains`, `upsertRole`, `deleteRole` | Query / Mutations | Admin | Expectativas por dominio y perfil de cargo |
 | `assessmentHistory` | `getByUser` | Query | Admin | Evolución de evaluaciones por colaborador |
+| `invitation` | `preview`, `redeem` | Query / Mutation | Público / Protegido | Valida y canjea invitaciones de un solo uso |
 
 ### Endpoints Express (fuera de tRPC)
 
@@ -353,6 +356,19 @@ Login (Manus OAuth)
               └─→ Resumen AI de la evaluación
 ```
 
+### Invitación — Flujo completo
+
+```
+Administrador crea invitación (token aleatorio de 32 bytes)
+  └─→ Copia /join?token=... (vigencia de 7 días)
+        └─→ Invitado abre el enlace y recibe una previsualización pública
+              └─→ OAuth conserva la ruta interna /join durante el login
+                    └─→ Servidor valida expiración, estado pendiente y correo
+                          └─→ UPDATE condicional marca el token como usado
+                                └─→ Se asigna el rol sin degradar admins existentes
+                                      └─→ Redirección al dashboard correspondiente
+```
+
 ---
 
 ## 9. Decisiones de Desarrollo
@@ -385,6 +401,10 @@ El control de acceso se implementa como un middleware tRPC en `server/middleware
 
 El `rate-limit.ts` implementa un rate limiter en memoria (sin Redis) con ventanas deslizantes: 120 req/min para la API general y 20 req/min para endpoints LLM. Esta decisión es apropiada para el volumen actual de uso interno. Si la plataforma escala a múltiples instancias, se deberá migrar a un store compartido (Redis).
 
+### Invitaciones de un solo uso
+
+Los tokens se generan con `crypto.randomBytes(32)` y se almacenan como valores hexadecimales de 64 caracteres. El endpoint público solo revela datos mínimos de una invitación válida. El canje requiere una sesión OAuth, compara el correo normalizado cuando la invitación es restringida y ejecuta una actualización condicional `usedAt IS NULL`; así, dos solicitudes concurrentes no pueden canjear el mismo enlace. El retorno de OAuth acepta únicamente rutas internas, evitando open redirects.
+
 ### Resiliencia de la consulta de sesión
 
 La página pública consulta `auth.me` para determinar si debe mostrar acceso al dashboard o los controles de inicio de sesión. Esa llamada ahora utiliza una política explícita de **un único reintento** con espera exponencial breve (400 ms, acotada a 1.5 s). La decisión evita que un corte momentáneo de red o una reconexión del servidor de desarrollo se presente como un fallo definitivo, sin ocultar errores persistentes ni generar reintentos indefinidos.
@@ -395,7 +415,7 @@ La página pública consulta `auth.me` para determinar si debe mostrar acceso al
 
 ### Autenticación y autorización
 
-La autenticación utiliza **Manus OAuth 2.0** con cookies `HttpOnly`, `Secure` y `SameSite=None` firmadas con `JWT_SECRET`. El flujo completo está implementado en `server/_core/oauth.ts` y nunca expone tokens al JavaScript del cliente. El rol del usuario se almacena en la base de datos y se verifica en cada procedimiento protegido a través del contexto tRPC (`ctx.user.role`).
+La autenticación utiliza **Manus OAuth 2.0** con cookies `HttpOnly`, `Secure` y `SameSite=None` firmadas con `JWT_SECRET`. El flujo completo está implementado en `server/_core/oauth.ts` y nunca expone tokens al JavaScript del cliente. El rol del usuario se almacena en la base de datos y se verifica en cada procedimiento protegido a través del contexto tRPC (`ctx.user.role`). En enlaces de invitación, OAuth conserva solo un destino interno validado para regresar a `/join?token=...`.
 
 ### Audit trail
 
@@ -403,7 +423,7 @@ El `audit.service.ts` registra en formato JSON estructurado todas las acciones c
 
 ### Testing
 
-El proyecto mantiene **124 tests** distribuidos en 8 archivos, organizados por sprint y por comportamiento transversal. Los tests cubren el motor de scoring, el servicio de audit, las reglas de RBAC, el rate limiting, el Competency Engine, el streaming SSE, los filtros del dashboard admin, la exportación CSV, las rutas de aprendizaje y la política de reintento de autenticación.
+El proyecto mantiene **129 tests** distribuidos en 9 archivos, organizados por sprint y por comportamiento transversal. Los tests cubren el motor de scoring, el servicio de audit, las reglas de RBAC, el rate limiting, el Competency Engine, el streaming SSE, los filtros del dashboard admin, la exportación CSV, las rutas de aprendizaje, la política de reintento de autenticación y la protección de invitaciones contra correo incorrecto, expiración y open redirect.
 
 ```bash
 pnpm test          # Ejecutar todos los tests
@@ -425,7 +445,8 @@ pnpm test --watch  # Modo watch durante desarrollo
 | **UX/UI** | Experiencia de producto | Componentes reutilizables, layout animado, métricas y progreso con motion accesible |
 | **Sprint A** | Analítica y comunicación | Notificaciones, reporte PDF individual y comparativa de equipos |
 | **Sprint D** | Administración del talento | Usuarios e invitaciones, perfiles de cargo e historial de evaluaciones |
-| **Estabilidad tRPC** | Resiliencia de sesión | Reintento acotado de `auth.me`, 124 tests y TypeScript validado |
+| **Estabilidad tRPC** | Resiliencia de sesión | Reintento acotado de `auth.me`, 129 tests y TypeScript validado |
+| **Invitaciones seguras** | Activación de colaboradores | Preview público, OAuth con retorno interno, canje de un solo uso, control de correo y expiración |
 
 ---
 

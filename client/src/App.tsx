@@ -14,6 +14,7 @@ import LearningPath from "./pages/LearningPath";
 import TeamComparison from "./pages/TeamComparison";
 import UserManagement from "./pages/UserManagement";
 import RoleProfiles from "./pages/RoleProfiles";
+import JoinInvitation from "./pages/JoinInvitation";
 import IttiLayout from "./components/IttiLayout";
 import { useAuth } from "./_core/hooks/useAuth";
 import { getLoginUrl } from "./const";
@@ -101,6 +102,7 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/join" component={JoinInvitation} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>

@@ -1,11 +1,14 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
+import { normalizeReturnPath } from "@shared/invitation-policy";
 
 // Generate login URL at runtime so redirect URI reflects the current origin.
-export const getLoginUrl = () => {
+// returnPath lets invitation links survive the OAuth round-trip.
+export const getLoginUrl = (returnPath = "/") => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
-  const state = btoa(redirectUri);
+  const safeReturnPath = normalizeReturnPath(returnPath);
+  const state = btoa(JSON.stringify({ redirectUri, returnPath: safeReturnPath }));
 
   const url = new URL(`${oauthPortalUrl}/app-auth`);
   url.searchParams.set("appId", appId);
